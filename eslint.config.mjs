@@ -7,12 +7,14 @@ const eslintConfig = defineConfig([
   ...nextTs,
   globalIgnores([
     "dist/**",
+    "dist-node/**",
     ".vinext/**",
     ".wrangler/**",
     ".sites-runtime/**",
     "outputs/**",
     "work/**",
   ]),
+  { files: ["server/index.mjs"], rules: { "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }] } },
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {

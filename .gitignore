@@ -11,6 +11,7 @@
 
 # Generated builds and framework state
 /dist/
+/dist-node/
 /.next/
 /.vinext/
 /out/
@@ -28,6 +29,7 @@ yarn-error.log*
 
 # Local environment and keys
 .env*
+!.env.example
 .dev.vars*
 *.pem
 
