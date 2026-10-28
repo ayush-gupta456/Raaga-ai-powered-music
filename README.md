@@ -1,19 +1,24 @@
 # Raaga Studio
 
-A responsive, buildless music creation workspace. Open `dist/` through a static HTTP server.
+Private lyrics-to-song studio powered by ACE Music's hosted ACE-Step API. The existing browser library is preserved across the server migration.
 
 ## Working features
-- Vocal / instrumental creative briefs with lyrics, style presets, mood, language, instruments, tempo and target duration.
-- Browser-local IndexedDB library, draft editing, JSON export and deletion confirmation.
-- Working-draft recovery through localStorage.
-- Audio import (up to 50 MB), playback and download using browser-local storage.
-- Mobile layout, keyboard-accessible controls and reduced-motion support.
+Vocal/instrumental generation with complete lyrics, style, mood, language, tempo, instruments and 30–180 second target durations. Drafts save before generation. Returned audio is saved in IndexedDB and opened in the player. Includes playback, download, import, draft editing/export, search, responsive layout and progress/error messages.
 
-## Current limitations
-No music model is connected. Saving a brief does not generate audio. No account sync, payments, or cloud persistence are implemented. Browser storage clearing removes saved items; export important drafts and audio.
+## Configuration
+Configure ACESTEP_API_KEY as a secret in Sites runtime environment variables, then deploy. Optional ACESTEP_MODEL overrides model discovery. Never put keys in source or browser storage. API base is fixed to https://api.acemusic.ai. The server uses /v1/models and /v1/chat/completions, with User-Agent RaagaStudio/1.0.
 
-## Next integration
-Choose a licensed hosted music API or deploy ACE-Step on a remote GPU. Add a server-side adapter with authenticated submit/status endpoints, persistent generation jobs, private object storage, retries, and idempotency. Keep provider secrets server-side. Only expose the Generate action once the integration can return genuine audio and report failures reliably.
+## Development
+Node 22.13+. npm run dev starts the supplied Vinext/Cloudflare server. npm run build builds the site. node --test tests/music.test.mjs checks validation, mapping, access controls and provider response handling. The Worker serves the studio HTML and /api/music/*; Vite serves client assets.
 
-## Preview
-`python -m http.server 4173 --bind 127.0.0.1 --directory dist`
+## Limits
+Owner-private personal studio. ACE Music controls availability, quotas and output quality. Keep the tab open during generation. Requests time out after four minutes; an interrupted request may still run upstream, so retries are manual. Responses are limited to 16 MB. Only inline audio data URLs are accepted.
+
+Songs and drafts stay in this browser, with no cloud synchronization. Download/export backups; clearing browser data removes the library. In-flight duplicate protection applies per running server instance. Before public or multi-user use, add durable jobs, distributed quotas and private object storage.
+
+## Official resources
+- https://github.com/ace-step/ace-step-skills
+- https://ace-step.github.io/ACE-Step-1.5/en/
+- https://acemusic.ai/playground/api-key
+
+Installed companion skills: acestep, acestep-docs, acestep-songwriting. Skills assist development; the deployed website uses its server adapter.
