@@ -24,7 +24,7 @@ Production uses the Sites secret `ACESTEP_API_KEY`. For local Node use, copy `.e
 | `MUSIC_TIMEOUT_MS` | 600000 | Processing timeout; 10–900000 ms |
 | `MUSIC_MAX_CONCURRENT` | 2 | Per-instance concurrency; 1–10 |
 | `MUSIC_MAX_REQUESTS` | 3 | Per-user requests per window; 1–100 |
-| `MUSIC_RATE_WINDOW_MS` | 60000 | Counter retention; 10000–3600000 ms |
+| `MUSIC_RATE_WINDOW_MS` | 60000 | Counter retention; 10–3600000 ms |
 | `PORT` | 3000 | Local Express port |
 
 Only expiring rate/concurrency counters exist in server memory. No prompt/audio/job records are retained. Restart discards counters. In-flight work ends at timeout or disconnect; a provider that ignores abort may finish remotely. There are no temporary files requiring restart cleanup.
@@ -58,3 +58,4 @@ Rate/concurrency enforcement is per process/Worker isolate, not a distributed qu
 - [Express security](https://expressjs.com/en/advanced/best-practice-security/)
 
 Companion skills assist development; the deployed website calls its server adapter directly.
+

@@ -43,7 +43,7 @@ export default function MusicStudio(){
    const url=owner.accept(blob,request.version);if(!url)return;
    const filename=response.headers.get('Content-Disposition')?.match(/filename="([a-zA-Z0-9 _.-]+)"/)?.[1]||`ai-generated-song.${blob.type.includes('wav')?'wav':blob.type.includes('flac')?'flac':'mp3'}`;
    setResult({url,filename,title:form.title.trim()||'Your new song',duration:null});setPhase('ready');
-  }catch(e){if(!request.signal.aborted){owner.clearAudio();setResult(null);setError(e instanceof Error?e.message:'Connection lost. Please retry when you are online.');setPhase('error');}}
+  }catch(e){if(!request.signal.aborted){owner.clearAudio();setResult(null);setError(e instanceof TypeError?'The audio transfer was interrupted. Check your connection, then retry when ready. ACE Music may already have finished the song.':e instanceof Error?e.message:'Connection lost. Please retry when you are online.');setPhase('error');}}
   finally{if(owner.version===request.version)owner.controller=null;}
  }
  function cancel(){session.current?.dispose();setResult(null);setPhase('idle');setError('Request stopped in this studio. ACE Music may still finish processing it.');}
@@ -71,5 +71,6 @@ export default function MusicStudio(){
   <dialog ref={guide}><button className="dialog-close icon-button" aria-label="Close guide" onClick={()=>guide.current?.close()}><X/></button><span className="eyebrow">WELCOME TO RAAGA</span><h2>Create. Listen. Take it with you.</h2><ol><li>Describe your song and set its length. Add lyrics if you have them.</li><li>Choose Create Song and wait for ACE Music to return the audio.</li><li>Preview your song and download it before leaving.</li></ol><p>New generations replace the current result. Refreshing, reopening or starting fresh clears this studio. This version never restores or writes song history. This does not delete copies held by ACE Music, legacy browser data, or files you download.</p><button className="primary" onClick={()=>guide.current?.close()}>Let’s make something</button></dialog>
  </>;
 }
+
 
 
