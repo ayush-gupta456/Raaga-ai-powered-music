@@ -33,7 +33,7 @@ window.addEventListener('hashchange',()=>{const name=location.hash==='#library'?
 (async()=>{try{const draft=JSON.parse(localStorage.getItem('raaga-working-draft'));if(draft)fill(draft)}catch{}setMode(mode);view(location.hash==='#library'?'library':'studio');try{db=await database();await refresh()}catch{toast('Browser storage is unavailable. Draft saving requires local storage access.')}})();
 
 let generating=false;
-async function checkEngine(){try{const response=await fetch('/api/music/status');if(!response.ok)throw Error();const state=await response.json();$('#engine-status').textContent=state.configured?'ACE Music connected · Ready to generate':'Music engine needs configuration. You can still save drafts.';$('#generate-song').disabled=!state.configured;}catch{$('#engine-status').textContent='Cannot reach the music engine. Reload to reconnect.';}}
+async function checkEngine(){try{const response=await fetch('/api/music/status');if(!response.ok)throw Error();const state=await response.json();$('#engine-status').textContent=state.configured?'ACE Music configured · Ready to request a song':'Music engine needs configuration. You can still save drafts.';$('#generate-song').disabled=!state.configured;}catch{$('#engine-status').textContent='Cannot reach the music engine. Reload to reconnect.';}}
 $('#generate-song').onclick=async()=>{
  if(generating)return;
  const data={...readForm(),mode};$('#form-error').textContent='';
