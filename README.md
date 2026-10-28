@@ -1,24 +1,60 @@
 # Raaga Studio
 
-Private lyrics-to-song studio powered by ACE Music's hosted ACE-Step API. The existing browser library is preserved across the server migration.
+A private, stateless React music studio using the official ACE Music API. Describe a song, optionally supply lyrics, choose a duration range, create, preview and download. The existing design, presets, instruments, language, tempo and 10–600 second controls are retained.
 
-## Working features
-Vocal/instrumental generation with complete lyrics, style, mood, language, tempo, instruments and minimum and maximum durations from 10–600 seconds, with a lyrics-based target estimate. Drafts save before generation. Returned audio is saved in IndexedDB and opened in the player. Includes playback, download, import, draft editing/export, search, responsive layout and progress/error messages.
+## Data lifecycle
+The current form and result exist only in React state. Generating again replaces the result. Refresh, reopen or Start fresh returns to an empty studio. Blob URLs are revoked on replacement, reset and page exit. Download songs before leaving.
+
+No database, browser storage, history endpoint, audio files or object storage are used for new generations. Legacy browser data from earlier versions is left untouched, but is not read or displayed. Provider-held copies and downloaded files are outside Raaga's cleanup.
+
+## Architecture
+`components/music-studio.tsx` → `POST /api/music/generate` → `lib/music.mjs` → `lib/providers/ace-music.mjs` → official ACE Music → validated binary audio → browser Blob player/download.
+
+Production retains the private Sites Cloudflare Worker (`worker/index.ts`). A Node/Express entrypoint (`server/index.mjs`) runs the same API and React interface locally. No scraping, selectors, cookies or access-control bypass is used. The documented provider is synchronous, so there are no invented job, progress or polling endpoints. `GET /api/music/status` reports configuration only.
+
+Requests and responses are bounded (32 KB input, 16 MB provider JSON). Audio signatures and MIME types are validated for MP3/WAV/FLAC. Credentials remain on the backend; redirects and arbitrary audio URLs are rejected. The UI shows elapsed time, supports stopping the local request, and retries only on user action. Cancellation cannot guarantee cancellation at the provider.
 
 ## Configuration
-Configure ACESTEP_API_KEY as a secret in Sites runtime environment variables, then deploy. Optional ACESTEP_MODEL overrides model discovery. Never put keys in source or browser storage. API base is fixed to https://api.acemusic.ai. The server uses /v1/models and /v1/chat/completions, with User-Agent RaagaStudio/1.0.
+Production uses the Sites secret `ACESTEP_API_KEY`. For local Node use, copy `.env.example` to `.env` and enter your own key there. `.env` is ignored by Git. Never put secrets in React variables or commit them.
 
-## Development
-Node 22.13+. npm run dev starts the supplied Vinext/Cloudflare server. npm run build builds the site. node --test tests/music.test.mjs checks validation, mapping, access controls and provider response handling. The Worker serves the studio HTML and /api/music/*; Vite serves client assets.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ACESTEP_API_KEY` | Required | ACE Music account API key |
+| `ACESTEP_MODEL` | Discovered | Optional model override |
+| `MUSIC_TIMEOUT_MS` | 600000 | Processing timeout; 10–900000 ms |
+| `MUSIC_MAX_CONCURRENT` | 2 | Per-instance concurrency; 1–10 |
+| `MUSIC_MAX_REQUESTS` | 3 | Per-user requests per window; 1–100 |
+| `MUSIC_RATE_WINDOW_MS` | 60000 | Counter retention; 10000–3600000 ms |
+| `PORT` | 3000 | Local Express port |
+
+Only expiring rate/concurrency counters exist in server memory. No prompt/audio/job records are retained. Restart discards counters. In-flight work ends at timeout or disconnect; a provider that ignores abort may finish remotely. There are no temporary files requiring restart cleanup.
+
+## Run and verify
+Node 22.13 or later is required.
+
+```sh
+npm ci
+npm test
+npm run lint
+npx tsc --noEmit
+npm run build:node
+npm run start:node
+```
+
+Open `http://127.0.0.1:3000`. Express binds to loopback only and checks the exact origin. It is a local single-user server, not a public authentication system. Production uses Sites' trusted visitor identity and retains owner-private access. Do not expose Express publicly without adding proper authentication and deployment controls.
+
+The hosted build uses `npm run build` (or the Sites build helper); `npm run dev` provides the existing Worker development flow. See [architecture and audit](docs/stateless-upgrade.md) and [verification record](docs/verification.md).
 
 ## Limits
-Owner-private personal studio. ACE Music controls availability, quotas and output quality. Keep the tab open during generation. Requests time out after ten minutes; an interrupted request may still run upstream, so retries are manual. Responses are limited to 16 MB. Only inline audio data URLs are accepted.
+ACE Music controls availability, account credits, accepted duration and output quality. The requested target falls inside your chosen range; actual length may differ. A ten-minute setting is not a guarantee that the provider will generate ten minutes. The 16 MB response limit can reject large outputs. No automatic retry occurs after ambiguous failures.
 
-Songs and drafts stay in this browser, with no cloud synchronization. Download/export backups; clearing browser data removes the library. In-flight duplicate protection applies per running server instance. Before public or multi-user use, add durable jobs, distributed quotas and private object storage.
+Rate/concurrency enforcement is per process/Worker isolate, not a distributed quota. This remains a private personal studio. A public multi-user service requires separate distributed abuse controls. Provider retention follows its own policies.
 
-## Official resources
-- https://github.com/ace-step/ace-step-skills
-- https://ace-step.github.io/ACE-Step-1.5/en/
-- https://acemusic.ai/playground/api-key
+## Official references
+- [ACE-Step cloud API](https://github.com/ace-step/ace-step-skills/blob/main/skills/acestep/api-reference.md)
+- [ACE-Step skills](https://github.com/ace-step/ace-step-skills)
+- [React cleanup](https://react.dev/reference/react/useEffect)
+- [Blob URL cleanup](https://developer.mozilla.org/en-US/docs/Web/API/URL/revokeObjectURL_static)
+- [Express security](https://expressjs.com/en/advanced/best-practice-security/)
 
-Installed companion skills: acestep, acestep-docs, acestep-songwriting. Skills assist development; the deployed website uses its server adapter.
+Companion skills assist development; the deployed website calls its server adapter directly.

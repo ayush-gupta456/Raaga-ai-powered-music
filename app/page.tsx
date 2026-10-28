@@ -1,1 +1,2 @@
-export default function Home(){return <main>Raaga Studio</main>;}
+import MusicStudio from '../components/music-studio';
+export default function Home(){return <MusicStudio/>;}

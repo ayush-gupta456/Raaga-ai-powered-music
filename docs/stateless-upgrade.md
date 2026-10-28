@@ -19,7 +19,7 @@ React state → same-origin POST → input/access/rate validation → provider a
 
 One synchronous request matches the verified provider contract. There is no job database, history API, file directory or object bucket. No polling endpoints or invented provider progress. The UI describes observable phases (requesting / receiving / ready), with elapsed time rather than percentages. Retry is explicit; do not retry a generation automatically after an uncertain network failure.
 
-Only operational concurrency/rate entries remain briefly in server memory, with configurable expiry. Abort/timeouts release request references. Server restarts discard this state. Browser cleanup revokes audio URLs on replacement, reset, page exit and unmount. Back-forward cache restoration resets the interface. Old Raaga browser keys/database are deleted without reading their contents as a migration; no new persistent writes are introduced.
+Only operational concurrency/rate entries remain briefly in server memory, with configurable expiry. Abort/timeouts release request references. Server restarts discard this state. Browser cleanup revokes audio URLs on replacement, reset, page exit and unmount. Back-forward cache restoration resets the interface. Legacy browser data is left untouched to avoid destructive migration. The new interface never reads it and never writes new persistent song data. Automatic approval review rejected deleting that data without a separate explicit deletion request.
 
 ## Provider authorization and research
 
