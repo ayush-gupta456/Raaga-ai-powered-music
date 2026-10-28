@@ -3,3 +3,5 @@
 .mini-wave{white-space:nowrap;font-size:18px;letter-spacing:2px}@media(max-width:540px){.chips button{min-height:36px}.song-actions button{min-height:44px;min-width:44px}.sidebar{padding-bottom:max(5px,env(safe-area-inset-bottom))}}
 
 .save-draft{width:100%;justify-content:center;margin-top:12px}#generation-status{font-size:13px;color:#d7c6b6;line-height:1.5}button:disabled{opacity:.55;cursor:wait}
+
+.duration-panel{margin-top:24px;padding-top:6px}.duration-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.duration-panel .quiet{font-size:12px;line-height:1.6}.duration-panel .error{color:#ff9b90}.duration-grid input{width:100%}@media(max-width:480px){.duration-grid{grid-template-columns:1fr;gap:12px}}

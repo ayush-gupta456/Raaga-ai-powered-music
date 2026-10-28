@@ -1,16 +1,17 @@
+import {durationRange,targetDuration,formatDuration} from './duration.mjs';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const icons={spark:'<path d="m12 3 2.7 6.3L21 12l-6.3 2.7L12 21l-2.7-6.3L3 12l6.3-2.7Z"/>',library:'<path d="M4 4v16M9 4v16M14 4v16m4-15 3 14"/>',mic:'<rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>',wave:'<path d="M3 10v4m4-8v12m5-16v20m5-16v12m4-8v4"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',save:'<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10V3M7 21v-8h10v8"/>',bulb:'<path d="M9 18h6m-6 3h6M8 14a7 7 0 1 1 8 0c-1 1-1 2-1 4H9c0-2 0-3-1-4Z"/>',search:'<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',upload:'<path d="M12 16V3m-5 5 5-5 5 5M3 16v5h18v-5"/>',download:'<path d="M12 3v13m-5-5 5 5 5-5M3 16v5h18v-5"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',play:'<path d="m8 4 12 8-12 8Z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',edit:'<path d="m15 4 5 5M4 20l5-1L21 7l-5-5L4 14Z"/>'};
 function icon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]||icons.wave}</svg>`}$$('[data-icon]').forEach(e=>e.innerHTML=icon(e.dataset.icon));
 let songs=[],mode='vocals',editing=null,deleteId=null,playingId=null,objectURL=null,toastTimer,db;
-const fields=['title','lyrics','style','mood','language','voice','tempo','duration','instruments'];
+const fields=['title','lyrics','style','mood','language','voice','tempo','minDuration','maxDuration','instruments'];
 const styles={'Bollywood':'Romantic Bollywood ballad with warm strings, expressive vocals, piano, and gentle tabla.','Lo-fi':'Dreamy lo-fi beat with mellow electric piano, warm bass, soft drums, and vinyl texture.','Indie folk':'Intimate indie folk with fingerpicked acoustic guitar, warm vocals, and gentle percussion.','Hip-hop':'Confident hip-hop with a tight drum groove, deep bass, and rhythmic vocal delivery.','Electronic':'Uplifting electronic music with layered synthesizers, a steady dance beat, and bright melodic hooks.'};
 const examples={monsoon:{title:'Monsoon memories',lyrics:'[Verse]\nबारिश की बूंदों में तेरा नाम लिखूँ\nखामोश सी शामों में तुझको ही सुनूँ\nभीगी हुई राहों में फिर से चलें\nअधूरी कहानी को मिलकर बुनें\n\n[Chorus]\nथोड़ा सा तू, थोड़ा सा मैं\nबन जाए बारिश का एक नया गीत\nथोड़ा सा कल, थोड़ा सा आज\nदिल की धड़कन में तेरी आवाज़',style:styles.Bollywood,mood:'Romantic',language:'Hindi',voice:'Soft male vocal',mode:'vocals'},midnight:{title:'After hours',lyrics:'',style:styles['Lo-fi'],mood:'Dreamy',language:'English',voice:'Let the music decide',mode:'instrumental'},golden:{title:'Chasing daylight',lyrics:'[Verse]\nThere’s a road beyond the window\nAnd a sky I haven’t seen\nI’ll leave my worries by the doorway\nTake the long way through the green\n\n[Chorus]\nWe’re chasing daylight, catching gold\nFinding stories still untold\nWith a little hope and open hands\nWe’ll make a home in distant lands',style:styles['Indie folk'],mood:'Peaceful',language:'English',voice:'Soft female vocal',mode:'vocals'}};
 function toast(message){clearTimeout(toastTimer);$('#toast').textContent=message;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),3500)}
-function setMode(value){mode=value;$$('[data-mode]').forEach(b=>{b.classList.toggle('selected',b.dataset.mode===value);b.setAttribute('aria-pressed',String(b.dataset.mode===value))});$('#lyrics').disabled=value==='instrumental';$('#voice').disabled=value==='instrumental';$('#language').disabled=value==='instrumental';$('#lyrics').closest('.lyrics-wrap').style.opacity=value==='instrumental'?'.4':'1'}
-function count(){$('#character-count').textContent=`${$('#lyrics').value.length.toLocaleString()} / 3,500`}
+function setMode(value){mode=value;updateDuration();$$('[data-mode]').forEach(b=>{b.classList.toggle('selected',b.dataset.mode===value);b.setAttribute('aria-pressed',String(b.dataset.mode===value))});$('#lyrics').disabled=value==='instrumental';$('#voice').disabled=value==='instrumental';$('#language').disabled=value==='instrumental';$('#lyrics').closest('.lyrics-wrap').style.opacity=value==='instrumental'?'.4':'1'}
+function count(){updateDuration();$('#character-count').textContent=`${$('#lyrics').value.length.toLocaleString()} / 3,500`}
 function readForm(){return Object.fromEntries(fields.map(f=>[f,$('#'+f).value]))}
 function persistForm(){try{localStorage.setItem('raaga-working-draft',JSON.stringify({...readForm(),mode}))}catch{}}
-function fill(data){fields.forEach(f=>{if(data[f]!==undefined)$('#'+f).value=data[f]});setMode(data.mode||'vocals');count();persistForm()}
+function fill(data){data={minDuration:'60',maxDuration:'180',...data};fields.forEach(f=>{if(data[f]!==undefined)$('#'+f).value=data[f]});setMode(data.mode||'vocals');count();persistForm()}
 function view(name){$('#studio-view').hidden=name!=='studio';$('#library-view').hidden=name!=='library';$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));$('#breadcrumb').textContent=name==='library'?'My library':'Create a song';location.hash=name;render();window.scrollTo({top:0})}
 function database(){return new Promise((resolve,reject)=>{const req=indexedDB.open('raaga-studio',1);req.onupgradeneeded=()=>req.result.createObjectStore('songs',{keyPath:'id'});req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 function transaction(type,action){return new Promise((resolve,reject)=>{const tx=db.transaction('songs',type),store=tx.objectStore('songs');let result;const req=action(store);req.onsuccess=()=>result=req.result;tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error)})}
@@ -23,7 +24,7 @@ function safeName(name){return name.replace(/[^\p{L}\p{N} _-]/gu,'').slice(0,70)
 function handle(action,song){if(action==='delete'){deleteId=song.id;$('#delete-dialog').showModal();return}if(action==='export'){if(song.type==='audio')exportFile(song.blob,song.filename);else{const {id,updated,type,...brief}=song;exportFile(new Blob([JSON.stringify(brief,null,2)],{type:'application/json'}),safeName(song.title)+'.json')}return}if(song.type==='audio'){if(objectURL)URL.revokeObjectURL(objectURL);objectURL=URL.createObjectURL(song.blob);playingId=song.id;$('#audio').src=objectURL;$('#player-title').textContent=song.title;$('#player').hidden=false;$('#audio').play().catch(()=>toast('Press play to listen.'));return}editing=song.id;fill(song);view('studio');toast('Draft opened. Saving will update this idea.')}
 $('#song-form').onsubmit=async e=>{e.preventDefault();$('#form-error').textContent='';const data=readForm();if(mode==='vocals'&&!data.lyrics.trim()){$('#form-error').textContent='Add your lyrics, or choose an instrumental track.';$('#lyrics').focus();return}if(!data.style.trim()){$('#form-error').textContent='Describe your sound or choose a style above.';$('#style').focus();return}if(!db){toast('Local storage is unavailable. Please reload or enable browser storage.');return}const song={...data,id:editing||crypto.randomUUID(),title:data.title.trim()||'Untitled idea',mode,type:'draft',updated:Date.now()};try{await transaction('readwrite',s=>s.put(song));editing=song.id;await refresh();toast('Song idea saved to your library.')}catch{toast('Could not save. Your browser storage may be full.')}};
 $$('[data-mode]').forEach(b=>b.onclick=()=>{setMode(b.dataset.mode);persistForm()});fields.forEach(f=>$('#'+f).addEventListener('input',()=>{count();persistForm()}));$$('[data-style]').forEach(b=>b.onclick=()=>{$('#style').value=styles[b.dataset.style];$$('[data-style]').forEach(c=>c.classList.toggle('active',c===b));persistForm()});
-function preset(key){editing=null;fill({...examples[key],tempo:'Auto',duration:'2 minutes',instruments:''});view('studio');toast('Starting point loaded. Make it your own.')}
+function preset(key){editing=null;fill({...examples[key],tempo:'Auto',minDuration:'60',maxDuration:'180',instruments:''});view('studio');toast('Starting point loaded. Make it your own.')}
 $$('[data-preset]').forEach(b=>b.onclick=()=>preset(b.dataset.preset));$('#sample').onclick=()=>{if(mode==='instrumental'){toast('Instrumental tracks do not need lyrics.');return}$('#lyrics').value=examples[$('#language').value==='Hindi'?'monsoon':'golden'].lyrics;count();persistForm()};$('#inspire').onclick=()=>preset(['monsoon','midnight','golden'][Math.floor(Math.random()*3)]);
 $$('[data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));$('#view-library').onclick=()=>view('library');$('#new-song').onclick=()=>{editing=null;$('#song-form').reset();setMode('vocals');count();persistForm();view('studio');$('#title').focus()};$('#search').oninput=render;
 ['about','open-help','footer-help'].forEach(id=>$('#'+id).onclick=()=>$('#help-dialog').showModal());$('.dialog-close').onclick=()=>$('#help-dialog').close();$('#help-done').onclick=()=>$('#help-dialog').close();$('#cancel-delete').onclick=()=>$('#delete-dialog').close();$('#confirm-delete').onclick=async()=>{try{await transaction('readwrite',s=>s.delete(deleteId));if(editing===deleteId)editing=null;if(playingId===deleteId)closePlayer();$('#delete-dialog').close();await refresh();toast('Item deleted.')}catch{toast('Could not delete this item.')}};
@@ -37,12 +38,13 @@ async function checkEngine(){try{const response=await fetch('/api/music/status')
 $('#generate-song').onclick=async()=>{
  if(generating)return;
  const data={...readForm(),mode};$('#form-error').textContent='';
+ let target;try{target=targetDuration(data);}catch(error){$('#form-error').textContent=error.message;return;}
  if(!data.style.trim()||(mode==='vocals'&&!data.lyrics.trim())){$('#form-error').textContent='Add a sound description and lyrics, or choose Instrumental.';return;}
  if(!db){$('#form-error').textContent='Enable browser storage before generating so your song can be saved.';return;}
  generating=true;$('#generate-song').disabled=true;
  const draft={...data,id:editing||crypto.randomUUID(),title:data.title.trim()||'Untitled song',type:'draft',updated:Date.now()};
  let elapsed=0;const status=$('#generation-status');status.textContent='Saving your draft…';
- const timer=setInterval(()=>{elapsed+=1;status.textContent=`Creating your song… ${elapsed}s. Keep this tab open.`;},1000);
+ const timer=setInterval(()=>{elapsed+=1;status.textContent=`Creating your ${formatDuration(target)} song… ${elapsed}s elapsed. Keep this tab open.`;},1000);
  try{
   await transaction('readwrite',s=>s.put(draft));editing=draft.id;await refresh();
   const response=await fetch('/api/music/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
@@ -50,11 +52,19 @@ $('#generate-song').onclick=async()=>{
   if(!result.audio?.startsWith('data:audio/'))throw Error('No audio was returned.');
   const blob=await (await fetch(result.audio)).blob();
   const extension=blob.type.includes('wav')?'wav':blob.type.includes('flac')?'flac':'mp3';
-  const song={...data,id:crypto.randomUUID(),title:draft.title,type:'audio',generated:true,model:result.model,updated:Date.now(),filename:safeName(draft.title)+'.'+extension,blob};
-  try{await transaction('readwrite',s=>s.put(song));await refresh();handle('open',song);status.textContent='Your song is ready. Play it below or download it from your library.';toast('Song generated and saved.');}
+  const song={...data,id:crypto.randomUUID(),title:draft.title,type:'audio',generated:true,targetDuration:result.targetDuration,model:result.model,updated:Date.now(),filename:safeName(draft.title)+'.'+extension,blob};
+  try{await transaction('readwrite',s=>s.put(song));await refresh();handle('open',song);status.textContent=`Your song is ready (requested target ${formatDuration(result.targetDuration)}). Play it below or download it from your library.`;toast('Song generated and saved.');}
   catch{exportFile(blob,song.filename);status.textContent='Song generated, but browser storage is full. A download was started; check that it saved.';}
  }catch(error){$('#form-error').textContent=error.message||'Could not generate your song.';status.textContent='Your idea is safe. Try again when the engine is available.';}
  finally{clearInterval(timer);generating=false;$('#generate-song').disabled=false;}
 };
 window.addEventListener('beforeunload',e=>{if(generating){e.preventDefault();e.returnValue='';}});
 checkEngine();
+
+function updateDuration(){
+ const summary=$('#duration-summary');if(!summary)return;
+ try{const data={...readForm(),mode};const {min,max}=durationRange(data);summary.textContent=`Range ${formatDuration(min)}–${formatDuration(max)} · Estimated target ${formatDuration(targetDuration(data))}`;summary.classList.remove('error');}
+ catch(error){summary.textContent=error.message;summary.classList.add('error');}
+}
+$$('[data-duration-range]').forEach(button=>button.onclick=()=>{const [min,max]=button.dataset.durationRange.split(',');$('#minDuration').value=min;$('#maxDuration').value=max;updateDuration();persistForm();});
+updateDuration();
