@@ -1,6 +1,6 @@
 # Raaga Studio
 
-A private, stateless React music studio using the official ACE Music API. Describe a song, optionally supply lyrics, choose a duration range, create, preview and download. The existing design, presets, instruments, language, tempo and 10–600 second controls are retained.
+A private, stateless React music studio using the official ACE Music API. Enter your lyrics and a separate song style/description, choose a duration range, create, preview and download. Vocal songs require your lyrics; Instrumental mode creates music without them. The existing design, presets, instruments, language, tempo and 10–600 second controls are retained.
 
 ## Data lifecycle
 The current form and result exist only in React state. Generating again replaces the result. Refresh, reopen or Start fresh returns to an empty studio. Blob URLs are revoked on replacement, reset and page exit. Download songs before leaving.

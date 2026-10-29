@@ -33,3 +33,6 @@ The clearer transfer-error wording was then type-checked, linted and rebuilt for
 ## Deliberate limits
 Provider access, credits, availability and output quality remain external dependencies. Final duration may vary. Progress percentages are not available. Cancellation stops Raaga waiting but may not cancel remote processing. Counters expire per instance; there are no stored jobs/files. Provider-retained copies and user downloads are not deleted by refresh. This remains owner-private, with loopback-only local Express support.
 
+
+## Lyrics composer restoration — 2026-10-29
+Reviewed the active React UI, Blob session lifecycle, shared API/provider, validation, rate limits, audio handling, Express adapter and hosting configuration. Restored the visible Lyrics editor above the separate Song Style / Description field, with vocal-lyrics validation and instrumental controls. Sound presets now preserve lyrics already written instead of resetting the form. The backend and storage lifecycle remain unchanged. Existing provider duration and per-instance quota limitations still apply. The prior live audio evidence above belongs to the preceding release; this design restoration uses the same provider payload path.
