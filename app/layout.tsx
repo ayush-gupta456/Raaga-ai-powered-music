@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   title: "Raaga Studio",
   description: "Create songs from your lyrics and musical style.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/favicon.svg?v=raaga-1",
+    shortcut: "/favicon.svg?v=raaga-1",
   },
 };
 
