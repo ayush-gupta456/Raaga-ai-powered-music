@@ -13,3 +13,15 @@ test('rejects inverted, blank, partial, nonnumeric and out-of-bounds ranges',()=
 });
 test('new range takes precedence over stale legacy duration',()=>assert.equal(makePayload({...song,minDuration:120,maxDuration:120,duration:'30 seconds'},'ace-step').audio_config.duration,120));
 test('duration display includes minutes and seconds',()=>assert.equal(formatDuration(97),'1:37'));
+
+test('Auto leaves duration to the provider while preserving exact lyrics',()=>{
+ const data={...song,durationMode:'auto',minDuration:'',maxDuration:''};
+ const payload=makePayload(data,'ace-step');
+ assert.equal(targetDuration(data),null);
+ assert.equal(Object.hasOwn(payload.audio_config,'duration'),false);
+ assert.match(payload.messages[0].content,/<lyrics>Sing along<\/lyrics>/);
+ assert.equal(payload.sample_mode,undefined);
+ assert.equal(payload.audio_config.instrumental,false);
+ assert.equal(makePayload({...data,mode:'instrumental'},'ace-step').audio_config.instrumental,true);
+ assert.throws(()=>makePayload({...data,durationMode:'unbounded'},'ace-step'));
+});

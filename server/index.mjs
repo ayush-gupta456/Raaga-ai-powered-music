@@ -18,7 +18,9 @@ export function createApp({env=process.env,api=createMusicAPI({observe:createAIO
  app.get('/api/app-auth/session',async(req,res)=>{
   try{const config=authConfiguration(env);if(!config.configured)return res.json({user:null,configured:false,email:false,google:false,openai:false});
    const auth=await getAuth();const session=await auth.api.getSession({headers:fromNodeHeaders(req.headers)});
-   res.json({configured:true,email:config.email,google:config.google,openai:config.openai,user:session?.user?.emailVerified?{id:session.user.id,name:session.user.name,email:session.user.email}:null});
+   let linkedProviders=null;
+   if(session?.user?.emailVerified){try{const accounts=await auth.api.listUserAccounts({headers:fromNodeHeaders(req.headers)});linkedProviders=[...new Set(accounts.map(account=>account.providerId).filter(provider=>['google','openai','credential'].includes(provider)))];}catch{/* Fail closed: do not offer linking without account state. */}}
+   res.json({configured:true,email:config.email,google:config.google,openai:config.openai,linkedProviders,user:session?.user?.emailVerified?{id:session.user.id,name:session.user.name,email:session.user.email}:null});
   }catch{res.status(503).json({error:'Sign-in is temporarily unavailable. Please try again later.'});}
  });
  app.all('/api/auth/*splat',async(req,res)=>{

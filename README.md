@@ -28,7 +28,7 @@
 
 - **Your account, your key.** Connect a personal [ACE Music API key](https://acemusic.ai/playground/api-key) for the current session.
 - **Vocals or instrumental.** Keep creative control over the words, or create music without vocals.
-- **Flexible length.** Request a duration range from 10 seconds to 10 minutes; provider output length may vary.
+- **Flexible length.** Auto is the default: ACE Music chooses the length. Switch to a custom range from 10 seconds to 10 minutes; provider output length may vary.
 - **Secure accounts.** Google sign-in and verified email/password accounts, with password reset and explicit account linking.
 - **A focused workspace.** Responsive editor, sound presets, optional controls, cancellation and a listening room.
 - **Privacy-conscious analytics.** Product events and generation timing through PostHog, without lyrics, audio or credentials.

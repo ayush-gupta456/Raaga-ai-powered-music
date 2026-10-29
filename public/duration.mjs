@@ -1,5 +1,7 @@
 export const MIN_SECONDS=10, MAX_SECONDS=600;
 export function durationRange(data){
+  if(data.durationMode!==undefined&&!['auto','custom'].includes(data.durationMode))throw Error('Choose Auto or Custom song length.');
+  if(data.durationMode==='auto')return {min:MIN_SECONDS,max:MAX_SECONDS};
   const values=[data.minDuration,data.maxDuration];
   if(values.some(v=>(typeof v!=='number'&&typeof v!=='string')||String(v).trim()===''))throw Error('Enter both minimum and maximum durations.');
   const [min,max]=values.map(Number);
@@ -9,6 +11,7 @@ export function durationRange(data){
 }
 export function targetDuration(data){
   const {min,max}=durationRange(data);
+  if(data.durationMode==='auto')return null;
   const text=(data.lyrics||'').replace(/\[[^\]]*\]/g,'').trim();
   const words=text.split(/\s+/u).filter(Boolean).length;
   // A transparent planning estimate, not a guarantee of the model's arrangement.

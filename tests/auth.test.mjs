@@ -105,3 +105,34 @@ test('verified HTTP account can generate audio and sign-out revokes generation a
   assert.equal((await post('/api/auth/sign-out',{},cookie)).status,200);assert.equal((await post('/api/music/generate',song,cookie)).status,401);
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('resend verification is private, verifies the account, and linked provider state exposes no credentials',async()=>{
+ const {call,mail,auth,db}=fixture({GOOGLE_CLIENT_ID:'test-client',GOOGLE_CLIENT_SECRET:'test-secret'});
+ assert.equal((await call('sign-up/email',signup)).status,200);
+ const before=mail.length;
+ assert.equal((await call('send-verification-email',{email:signup.email,callbackURL:'/sign-in?verified=1'})).status,200);
+ assert.equal(mail.length,before+1);
+ const verification=new URL(mail.at(-1).text.match(/https?:\/\/\S+/)[0]);
+ assert.equal(verification.searchParams.get('callbackURL'),'/sign-in?verified=1');
+ assert.equal((await call('send-verification-email',{email:'missing@example.test',callbackURL:'/sign-in'})).status,200);
+ assert.equal(mail.length,before+1);
+ assert.equal((await call('verify-email?token='+verification.searchParams.get('token'))).status,200);
+ const login=await call('sign-in/email',{email:signup.email,password:signup.password});
+ const cookie=cookieOf(login);
+ const linking=await call('link-social',{provider:'google',callbackURL:origin+'/studio',errorCallbackURL:origin+'/studio?link-error=1',disableRedirect:true},cookie);
+ assert.equal(linking.status,200);
+ const destination=new URL((await linking.json()).url);
+ assert.equal(destination.origin,'https://accounts.google.com');
+ assert.equal(destination.searchParams.get('redirect_uri'),origin+'/api/auth/callback/google');
+ assert.ok(destination.searchParams.get('state'));
+ db.account.push({id:'google-account',userId:db.user[0].id,providerId:'google',accountId:'subject-id',accessToken:'never-expose-this-token',createdAt:new Date(),updatedAt:new Date()});
+ const app=createApp({env,getAuth:async()=>auth});const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{const base=`http://127.0.0.1:${server.address().port}`;
+  const state=await (await fetch(base+'/api/app-auth/session',{headers:{cookie}})).json();
+  assert.deepEqual(state.linkedProviders.sort(),['credential','google']);
+  assert.ok(!JSON.stringify(state).includes('never-expose'));
+  const anonymous=await (await fetch(base+'/api/app-auth/session')).json();assert.equal(anonymous.linkedProviders,null);
+ }finally{await new Promise(r=>server.close(r));}
+ assert.equal(auth.options.account.accountLinking.allowDifferentEmails,false);
+ assert.equal((await call('link-social',{provider:'google',callbackURL:'/studio'})).status,401);
+});
