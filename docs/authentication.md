@@ -87,3 +87,7 @@ Automated tests use real Better Auth with isolated in-memory data and captured m
 - Registration and unverified sign-in request a verification message. The resend form preserves the entered email, uses a 60-second UI cooldown, and is protected separately by database-backed rate limits. Unknown or already verified addresses receive generic responses. Links expire in one hour; a successful verification redirects to sign-in with confirmation.
 - `Link Google` appears only for signed-in, verified accounts when Google is configured and the backend confirms it is not linked. An accessible dialog explains that this adds Google to the same Raaga account, requires the same email, and does not connect the music engine. Already linked accounts show `Google connected`.
 - Provider listing errors hide linking actions, rather than assuming an account is unlinked. The session endpoint returns provider names only, never OAuth tokens or account secrets. Implicit merging remains disabled. Linking errors return to the studio with recovery guidance.
+
+### Mail-delivery diagnostics
+
+Production logs record `auth_verification_request` with `account_state` (`missing`, `already_verified`, `pending_verification`) and `auth_email_delivery` with provider/outcome. Failure codes are restricted to known SMTP categories. These server-only records contain no email addresses, message text, links, tokens, passwords or raw provider errors. Provider acceptance does not establish inbox delivery. Public responses continue to conceal account existence.

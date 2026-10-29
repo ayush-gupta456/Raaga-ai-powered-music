@@ -1,5 +1,5 @@
 import { betterAuth } from 'better-auth';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { mongodbAdapter } from '@better-auth/mongo-adapter';
 import { MongoClient } from 'mongodb';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
@@ -36,11 +36,19 @@ export function authConfiguration(env) {
  return {origin,secure,configured,openai,email:configured&&emailConfiguration(env).enabled,google:configured&&Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET)};
 }
 
-export function buildAuth({env,database,sendMail,rateStorage='database'}) {
+export function buildAuth({env,database,sendMail,rateStorage='database',report=event=>console.info(JSON.stringify(event))}) {
  const config=authConfiguration(env);
  if(!config.configured)throw Error('Authentication is not configured.');
  return betterAuth({
   appName:'Raaga Studio',baseURL:config.origin,secret:env.BETTER_AUTH_SECRET,
+  hooks:{before:createAuthMiddleware(async ctx=>{
+   if(ctx.path!=='/send-verification-email')return;
+   const email=ctx.body?.email;
+   if(typeof email!=='string')return;
+   try{const record=await ctx.context.internalAdapter.findUserByEmail(email.trim().toLowerCase());
+    report({event:'auth_verification_request',account_state:!record?'missing':record.user.emailVerified?'already_verified':'pending_verification'});
+   }catch{/* Diagnostics must not affect authentication. */}
+  })},
   database,trustedOrigins:[config.origin],logger:{disabled:true},
   plugins:config.openai?[genericOAuth({config:[openAIProviderConfig(env)]})]:[],
   emailAndPassword:{enabled:config.email,minPasswordLength:12,maxPasswordLength:128,requireEmailVerification:true,autoSignIn:false,revokeSessionsOnPasswordReset:true,resetPasswordTokenExpiresIn:1800,

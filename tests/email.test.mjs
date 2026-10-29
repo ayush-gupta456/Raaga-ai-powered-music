@@ -25,3 +25,13 @@ test('real Nodemailer composes the authenticated sender and only one recipient',
 test('Resend remains supported when Gmail has not been configured',async()=>{
  let sent=false;const sender=createEmailSender({RESEND_API_KEY:'test-only',AUTH_EMAIL_FROM:'sender@example.test'},{fetcher:async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');assert.deepEqual(JSON.parse(options.body).to,['listener@example.test']);sent=true;return Response.json({id:'test'});}});await sender({to:'listener@example.test',subject:'Test',text:'Test'});assert.equal(sent,true);
 });
+
+test('delivery diagnostics distinguish acceptance and auth failure without private content',async()=>{
+ const events=[];const report=event=>events.push(event);
+ const accepted=createEmailSender(env,{report,createTransport:()=>({sendMail:async()=>({accepted:['listener@example.test']})})});
+ await accepted({to:'listener@example.test',subject:'private subject',text:'private verification URL'});
+ const failed=createEmailSender(env,{report,createTransport:()=>({sendMail:async()=>{throw Object.assign(Error('private SMTP response'),{code:'EAUTH'});}})});
+ await assert.rejects(()=>failed({to:'listener@example.test',subject:'private subject',text:'private verification URL'}));
+ assert.deepEqual(events,[{event:'auth_email_delivery',provider:'gmail',outcome:'accepted'},{event:'auth_email_delivery',provider:'gmail',outcome:'failed',code:'EAUTH'}]);
+ for(const secret of ['listener@example.test','private','abcdefghijklmnop'])assert.ok(!JSON.stringify(events).includes(secret));
+});

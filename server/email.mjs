@@ -7,8 +7,9 @@ export function emailConfiguration(env){
  if(env.GMAIL_APP_PASSWORD)return {provider:'gmail',enabled:/^[A-Za-z0-9]{16}$/.test(password)&&/^[^\s<>@,;]+@(?:gmail|googlemail)\.com$/i.test(user),user,password};
  return {provider:'resend',enabled:Boolean(env.RESEND_API_KEY&&env.AUTH_EMAIL_FROM)};
 }
-export function createEmailSender(env,{createTransport=options=>nodemailer.createTransport(options),fetcher=fetch}={}){
+export function createEmailSender(env,{createTransport=options=>nodemailer.createTransport(options),fetcher=fetch,report=event=>console.info(JSON.stringify(event))}={}){
  const config=emailConfiguration(env);let transport;
+ const record=event=>{try{report({event:'auth_email_delivery',provider:config.provider,...event});}catch{/* Diagnostics never affect delivery. */}};
  return async({to,subject,text})=>{
   if(!config.enabled)throw Error('Email delivery is not configured.');
   if(typeof to!=='string'||!/^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.test(to))throw Error('Email delivery is unavailable.');
@@ -21,6 +22,11 @@ export function createEmailSender(env,{createTransport=options=>nodemailer.creat
     const response=await fetcher('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:env.AUTH_EMAIL_FROM,to:[to],subject,text}),signal:AbortSignal.timeout(10000)});
     if(!response.ok)throw Error('Provider rejected email.');
    }
-  }catch{throw Error('Email delivery is temporarily unavailable. Please try again later.');}
+   record({outcome:'accepted'});
+  }catch(error){
+   const code=['EAUTH','ECONNECTION','ETIMEDOUT','ESOCKET','EDNS','EENVELOPE','EMESSAGE'].includes(error?.code)?error.code:'delivery_failed';
+   record({outcome:'failed',code});
+   throw Error('Email delivery is temporarily unavailable. Please try again later.');
+  }
  };
 }

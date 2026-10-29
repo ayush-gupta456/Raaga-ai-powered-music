@@ -37,13 +37,13 @@ export default function AuthenticatedStudio(){
    const normalized=email.trim().toLowerCase();
    if(view==='sign-up'){
     await authRequest('sign-up/email',{name:name.trim(),email:normalized,password,callbackURL:'/sign-in?verified=1'});
-    setVerificationNeeded(true);setResendWait(60);track('account_created');setPassword('');setConfirm('');setView('verify-email');window.history.replaceState(null,'','/verify-email');setMessage('If this email can be registered, a verification link is on its way. Already have an account? Sign in or reset your password.');
+    setVerificationNeeded(true);setResendWait(60);track('account_created');setPassword('');setConfirm('');setView('verify-email');window.history.replaceState(null,'','/verify-email');setMessage('Registration request received. For a new account, check your inbox and Spam for a verification link. An existing account is not recreated—sign in or reset its password.');
    }else if(view==='sign-in'){
     await authRequest('sign-in/email',{email:normalized,password,callbackURL:'/studio'});setPassword('');track('sign_in_completed');await refresh();window.history.replaceState(null,'','/studio');
    }else if(view==='forgot-password'){
     await authRequest('request-password-reset',{email:normalized,redirectTo:window.location.origin+'/reset-password'});setMessage('If an account exists for this email, you will receive a reset link.');
    }else if(view==='verify-email'){
-    await authRequest('send-verification-email',{email:normalized,callbackURL:'/sign-in?verified=1'});setResendWait(60);setMessage('If verification is needed, a new link is on its way. Check your spam folder too.');
+    await authRequest('send-verification-email',{email:normalized,callbackURL:'/sign-in?verified=1'});setResendWait(60);setMessage('Request received. An email is sent only for an existing, unverified account. Check Spam too. If already verified, sign in; if you need a password, use Forgot password.');
    }else{
     const token=new URLSearchParams(window.location.search).get('token');if(!token)throw Error('This reset link is missing or expired. Request a new one.');
     await authRequest('reset-password',{newPassword:password,token});change('sign-in');setMessage('Password updated. Sign in with your new password.');
@@ -72,6 +72,6 @@ export default function AuthenticatedStudio(){
  {error&&<p className="error" role="alert">{error}</p>}{message&&<p className="auth-notice" role="status">{message}</p>}
  {view==='sign-in'&&state?.email&&verificationNeeded&&<button className="auth-link" disabled={busy} onClick={()=>change('verify-email')}>Resend verification email</button>}
  {(view==='sign-in'||view==='sign-up')&&<>{state?.email&&<div className="auth-divider"><span>OR</span></div>}{state?.openai&&<button className="chatgpt-button" type="button" disabled={busy} onClick={()=>void social('openai')}>Continue with ChatGPT</button>}<button className="google-button" type="button" disabled={busy||!state?.google} onClick={()=>void social('google')}><img src="/google.svg" width="20" height="20" alt=""/>Continue with Google</button>{!state?.google&&state?.configured&&<p className="quiet">Google sign-in is awaiting configuration.</p>}</>}
- <p className="auth-switch">{view==='sign-in'?<>New to Raaga? <button className="auth-link" onClick={()=>change('sign-up')}>Create an account</button></>:<>Already have an account? <button className="auth-link" onClick={()=>change('sign-in')}>Sign in</button></>}</p>
+ {view==='verify-email'&&<p className="auth-switch"><button className="auth-link" onClick={()=>change('forgot-password')}>Forgot password?</button></p>}<p className="auth-switch">{view==='sign-in'?<>New to Raaga? <button className="auth-link" onClick={()=>change('sign-up')}>Create an account</button></>:<>Already have an account? <button className="auth-link" onClick={()=>change('sign-in')}>Sign in</button></>}</p>
  <p className="auth-privacy">Your songs stay in this session. Usage analytics excludes your lyrics, audio and keys.</p></section></div></main>;
 }

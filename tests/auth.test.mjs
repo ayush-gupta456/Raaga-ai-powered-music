@@ -6,10 +6,10 @@ import {createApp} from '../server/index.mjs';
 const origin='http://127.0.0.1:3000';
 const env={MONGODB_URI:'mongodb://test-only',BETTER_AUTH_URL:origin,BETTER_AUTH_SECRET:'test-only-secret-with-more-than-thirty-two-characters',RESEND_API_KEY:'test',AUTH_EMAIL_FROM:'test@example.com'};
 function fixture(extra={}){
- const db={user:[],session:[],account:[],verification:[],rateLimit:[]},mail=[];
- const auth=buildAuth({env:{...env,...extra},database:memoryAdapter(db),sendMail:async message=>{mail.push(message);},rateStorage:'database'});
+ const db={user:[],session:[],account:[],verification:[],rateLimit:[]},mail=[],diagnostics=[];
+ const auth=buildAuth({env:{...env,...extra},database:memoryAdapter(db),sendMail:async message=>{mail.push(message);},report:event=>diagnostics.push(event),rateStorage:'database'});
  const call=async(path,body,cookie='')=>auth.handler(new Request(origin+'/api/auth/'+path,{method:body?'POST':'GET',headers:{origin,'Content-Type':'application/json',...(cookie?{cookie}:{})},...(body?{body:JSON.stringify(body)}:{})}));
- return {db,mail,auth,call};
+ return {db,mail,auth,call,diagnostics};
 }
 const signup={name:'Raaga Test',email:'raaga-test@example.com',password:'a-long-test-password!'};
 const cookieOf=r=>r.headers.get('set-cookie')?.split(';')[0]||'';
@@ -107,7 +107,7 @@ test('verified HTTP account can generate audio and sign-out revokes generation a
 });
 
 test('resend verification is private, verifies the account, and linked provider state exposes no credentials',async()=>{
- const {call,mail,auth,db}=fixture({GOOGLE_CLIENT_ID:'test-client',GOOGLE_CLIENT_SECRET:'test-secret'});
+ const {call,mail,auth,db,diagnostics}=fixture({GOOGLE_CLIENT_ID:'test-client',GOOGLE_CLIENT_SECRET:'test-secret'});
  assert.equal((await call('sign-up/email',signup)).status,200);
  const before=mail.length;
  assert.equal((await call('send-verification-email',{email:signup.email,callbackURL:'/sign-in?verified=1'})).status,200);
@@ -133,6 +133,10 @@ test('resend verification is private, verifies the account, and linked provider 
   assert.ok(!JSON.stringify(state).includes('never-expose'));
   const anonymous=await (await fetch(base+'/api/app-auth/session')).json();assert.equal(anonymous.linkedProviders,null);
  }finally{await new Promise(r=>server.close(r));}
+ assert.equal((await call('send-verification-email',{email:signup.email,callbackURL:'/sign-in'})).status,200);
+ assert.equal(mail.length,before+1);
+ assert.deepEqual(diagnostics.map(event=>event.account_state),['pending_verification','missing','already_verified']);
+ assert.ok(!JSON.stringify(diagnostics).includes(signup.email));
  assert.equal(auth.options.account.accountLinking.allowDifferentEmails,false);
  assert.equal((await call('link-social',{provider:'google',callbackURL:'/studio'})).status,401);
 });
