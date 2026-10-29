@@ -7,10 +7,12 @@ import { fromNodeHeaders } from 'better-auth/node';
 import { getRequest, setResponse } from 'better-call/node';
 import { createAuthService, authConfiguration } from './auth.mjs';
 import {analyticsConfiguration,createAIObserver} from './analytics.mjs';
+import {securityHeaders} from './security.mjs';
 
 export function createApp({env=process.env,api=createMusicAPI({observe:createAIObserver(env)}),port=3000,getAuth=createAuthService(env)}={}) {
  const app=express();app.disable('x-powered-by');
  const origin=env.BETTER_AUTH_URL?new URL(env.BETTER_AUTH_URL).origin:`http://127.0.0.1:${port}`;
+ app.use((_req,res,next)=>{for(const [key,value] of Object.entries(securityHeaders({secure:origin.startsWith('https:')})))res.setHeader(key,value);next();});
  app.get('/api/analytics/config',(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(analyticsConfiguration(env));});
  app.use((req,res,next)=>{res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');next();});
  app.get('/api/app-auth/session',async(req,res)=>{

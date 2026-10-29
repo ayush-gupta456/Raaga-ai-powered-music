@@ -89,3 +89,19 @@ test('Express auth HTTP adapter enforces sessions and logout using the real libr
   assert.equal((await fetch(base+'/api/music/status',{headers:{cookie}})).status,401);
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('verified HTTP account can generate audio and sign-out revokes generation access',async()=>{
+ const {createMusicAPI}=await import('../lib/music.mjs');const {auth,mail}=fixture();
+ const api=createMusicAPI({provider:{generate:async(data,{env})=>{assert.equal(env.ACESTEP_API_KEY,'isolated-listener-key');assert.equal(data.lyrics,'[Verse]\nA complete original verse');return {bytes:new Uint8Array([82,73,70,70]),mime:'audio/wav',extension:'wav',targetDuration:30};}}});
+ const app=createApp({env,api,getAuth:async()=>auth});const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`;
+ const post=(path,body,cookie='')=>fetch(base+path,{method:'POST',headers:{origin,'Content-Type':'application/json',cookie,'X-ACE-Music-Key':'isolated-listener-key'},body:JSON.stringify(body)});
+ try{
+  const email='e2e-account@example.test';assert.equal((await post('/api/auth/sign-up/email',{...signup,email})).status,200);
+  const song={mode:'vocals',lyrics:'[Verse]\nA complete original verse',style:'acoustic folk',minDuration:30,maxDuration:30,title:'HTTP e2e song'};
+  assert.equal((await post('/api/music/generate',song)).status,401);
+  const url=new URL(mail[0].text.match(/https?:\/\/\S+/)[0]);assert.equal((await fetch(base+'/api/auth/verify-email?token='+url.searchParams.get('token'))).status,200);
+  const login=await post('/api/auth/sign-in/email',{email,password:signup.password});assert.equal(login.status,200);const cookie=cookieOf(login);
+  const songResponse=await post('/api/music/generate',song,cookie);assert.equal(songResponse.status,200);assert.equal(songResponse.headers.get('content-type'),'audio/wav');assert.match(songResponse.headers.get('content-disposition'),/HTTP-e2e-song.wav/);assert.match(songResponse.headers.get('cache-control'),/no-store/);assert.equal((await songResponse.arrayBuffer()).byteLength,4);
+  assert.equal((await post('/api/auth/sign-out',{},cookie)).status,200);assert.equal((await post('/api/music/generate',song,cookie)).status,401);
+ }finally{await new Promise(r=>server.close(r));}
+});

@@ -29,7 +29,7 @@ export function openAIProviderConfig(env) {
 export function authConfiguration(env) {
  const origin=new URL(env.BETTER_AUTH_URL||'http://127.0.0.1:3000').origin;
  const secure=origin.startsWith('https:');
- if(env.BETTER_AUTH_URL&&env.NODE_ENV==='production'&&!secure)throw Error('Production authentication requires HTTPS.');
+ if(env.BETTER_AUTH_URL&&(env.NODE_ENV==='production'||env.VERCEL)&&!secure)throw Error('Production authentication requires HTTPS.');
  const configured=Boolean(env.MONGODB_URI&&env.BETTER_AUTH_SECRET?.length>=32&&env.BETTER_AUTH_URL);
  const openai=configured&&Boolean(env.OPENAI_OAUTH_CLIENT_ID&&(env.OPENAI_OAUTH_TOKEN_AUTH_METHOD==='none'||env.OPENAI_OAUTH_CLIENT_SECRET));
  return {origin,secure,configured,openai,email:configured&&Boolean(env.RESEND_API_KEY&&env.AUTH_EMAIL_FROM),google:configured&&Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET)};
