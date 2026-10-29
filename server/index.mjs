@@ -32,6 +32,7 @@ export function createApp({env=process.env,api=createMusicAPI(),port=3000,getAut
   const close=()=>{if(!res.writableEnded)controller.abort();};res.on('close',close);
   try {
    const headers=new Headers({'content-type':req.headers['content-type']||'',origin:req.headers.origin||''});
+   if(req.headers['x-ace-music-key']!==undefined)headers.set('x-ace-music-key',req.headers['x-ace-music-key']);
    // Identity comes exclusively from the verified backend session, never browser headers.
    headers.set('oai-authenticated-user-id',res.locals.user.id);
    const request=new Request(origin+req.originalUrl,{method:req.method,headers,signal:controller.signal,...(['GET','HEAD'].includes(req.method)?{}:{body:req.body?.length?new Uint8Array(req.body):''})});

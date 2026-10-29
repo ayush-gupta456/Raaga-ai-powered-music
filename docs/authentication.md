@@ -135,3 +135,10 @@ The login page hides ChatGPT sign-in when no registered OpenAI client is configu
 The Vercel dashboard revealed the failed build error: `No entrypoint found which imports express. Found possible entrypoint: index.mjs`. The root entrypoint now directly imports Express, mounts the existing application and exports it, following Vercel's detection contract.
 
 Dashboard inspection showed Google, Resend, MongoDB, session and music variables present, but `AUTH_EMAIL_FROM` absent. A verified Resend sender is still required for email/password signup and recovery. Secret values were not revealed or changed. Live consent, inbox delivery and music remain unverified until a successful deployment.
+
+## Personal ACE Music keys (2026-10-29)
+Signed-in listeners can paste their own key in the studio's Connect your ACE Music account panel, follow the official key-page link, show/hide the input, connect and disconnect. A connected key overrides the site key for that request only; no key is written to MongoDB, cookies, browser storage, URLs or song data. The key is sent in an HTTPS request header through the authenticated, same-origin Node endpoint to the fixed official ACE Music host. Provider model discovery uses that listener's account. Existing authentication and per-user limits still apply. An invalid personal key never falls back silently to the site's account.
+
+Connecting validates format only. The UI explicitly says ACE Music validates the key when generating; provider errors explain rejected keys, access denial and credits. Disconnecting, leaving, reloading and signing out clear the in-memory key. Without a personal key, the existing server key remains the fallback. The old ChatGPT studio link has been removed from sign-in.
+
+Validation: 38 tests pass, including request key isolation, shared-environment immutability, malformed keys, an unconfigured host and the authenticated Express forwarding path. Production build, TypeScript and lint pass. An isolated browser preview verified connect/disconnect and enabled/disabled generation with a dummy key; it made no real music request and does not claim live personal-key generation.
