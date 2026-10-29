@@ -4,6 +4,7 @@ import { mongodbAdapter } from '@better-auth/mongo-adapter';
 import { MongoClient } from 'mongodb';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { decodeJwt } from 'jose';
+import {emailConfiguration,createEmailSender} from './email.mjs';
 
 // A registered website client is required. Never reuse Codex or Sites client IDs.
 export function openAIProviderConfig(env) {
@@ -32,7 +33,7 @@ export function authConfiguration(env) {
  if(env.BETTER_AUTH_URL&&(env.NODE_ENV==='production'||env.VERCEL)&&!secure)throw Error('Production authentication requires HTTPS.');
  const configured=Boolean(env.MONGODB_URI&&env.BETTER_AUTH_SECRET?.length>=32&&env.BETTER_AUTH_URL);
  const openai=configured&&Boolean(env.OPENAI_OAUTH_CLIENT_ID&&(env.OPENAI_OAUTH_TOKEN_AUTH_METHOD==='none'||env.OPENAI_OAUTH_CLIENT_SECRET));
- return {origin,secure,configured,openai,email:configured&&Boolean(env.RESEND_API_KEY&&env.AUTH_EMAIL_FROM),google:configured&&Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET)};
+ return {origin,secure,configured,openai,email:configured&&emailConfiguration(env).enabled,google:configured&&Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET)};
 }
 
 export function buildAuth({env,database,sendMail,rateStorage='database'}) {
@@ -77,10 +78,7 @@ export function createAuthService(env=process.env) {
    const client=new MongoClient(env.MONGODB_URI,{maxPoolSize:5,serverSelectionTimeoutMS:8000,timeoutMS:15000});
    try{
     await client.connect();const db=client.db();await ensureAuthIndexes(db);
-    const sendMail=async({to,subject,text})=>{
-     const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:env.AUTH_EMAIL_FROM,to:[to],subject,text}),signal:AbortSignal.timeout(10000)});
-     if(!response.ok)throw Error('Email delivery is unavailable.');
-    };
+    const sendMail=createEmailSender(env);
     return buildAuth({env,database:mongodbAdapter(db,{client}),sendMail});
    }catch(error){await client.close();throw error;}
   })().catch(error=>{pending=undefined;throw error;});
