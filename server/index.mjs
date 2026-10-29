@@ -9,7 +9,7 @@ import { createAuthService, authConfiguration } from './auth.mjs';
 import {analyticsConfiguration,createAIObserver} from './analytics.mjs';
 import {securityHeaders} from './security.mjs';
 
-export function createApp({env=process.env,api=createMusicAPI({observe:createAIObserver(env)}),port=3000,getAuth=createAuthService(env)}={}) {
+export function createApp({env=process.env,api=createMusicAPI({observe:createAIObserver(env)}),port=3000,getAuth=createAuthService(env),pageFile=resolve('dist-node/index.html')}={}) {
  const app=express();app.disable('x-powered-by');
  const origin=env.BETTER_AUTH_URL?new URL(env.BETTER_AUTH_URL).origin:`http://127.0.0.1:${port}`;
  app.use((_req,res,next)=>{for(const [key,value] of Object.entries(securityHeaders({secure:origin.startsWith('https:')})))res.setHeader(key,value);next();});
@@ -25,13 +25,16 @@ export function createApp({env=process.env,api=createMusicAPI({observe:createAIO
   if(Number(req.headers['content-length']||0)>32000)return res.status(413).json({message:'The request is too large.'});
   try{const auth=await getAuth();return await setResponse(res,await auth.handler(getRequest({request:req,base:origin,bodySizeLimit:32000})));}catch{if(!res.headersSent)res.status(503).json({message:'Sign-in is not configured or is temporarily unavailable.'});}
  });
- const requireUser=async(req,res,next)=>{
+ const requireUser=({page=false}={})=>async(req,res,next)=>{
   try{const auth=await getAuth();const session=await auth.api.getSession({headers:fromNodeHeaders(req.headers)});
-   if(!session?.user?.emailVerified)return res.status(401).json({error:'Please sign in with a verified account.'});
+   if(!session?.user?.emailVerified){
+    if(page)return res.redirect(303,'/sign-in?reason='+(session?.user?'verify-email':'session-required'));
+    return res.status(401).json({error:'Please sign in with a verified account.'});
+   }
    res.locals.user=session.user;next();
-  }catch{res.status(503).json({error:'Sign-in is temporarily unavailable.'});}
+  }catch{if(page)return res.redirect(303,'/sign-in?reason=auth-unavailable');res.status(503).json({error:'Sign-in is temporarily unavailable.'});}
  };
- app.use('/api/music',requireUser,express.raw({type:'application/json',limit:'32kb'}),async(req,res)=>{
+ app.use('/api/music',requireUser(),express.raw({type:'application/json',limit:'32kb'}),async(req,res)=>{
   const controller=new AbortController();
   const close=()=>{if(!res.writableEnded)controller.abort();};res.on('close',close);
   try {
@@ -48,8 +51,8 @@ export function createApp({env=process.env,api=createMusicAPI({observe:createAIO
  app.get('/google.svg',(_req,res)=>res.sendFile(resolve('public/google.svg')));
  app.get('/favicon.svg',(_req,res)=>res.sendFile(resolve('public/favicon.svg')));
  app.use(express.static(resolve('dist-node'),{etag:false,lastModified:false}));
- app.get('/studio',requireUser,(_req,res)=>res.sendFile(resolve('dist-node/index.html')));
- app.get(['/', '/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/verify-email'],(_req,res)=>res.sendFile(resolve('dist-node/index.html')));
+ app.get('/studio',requireUser({page:true}),(_req,res)=>res.sendFile(pageFile));
+ app.get(['/', '/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/verify-email'],(_req,res)=>res.sendFile(pageFile));
  app.use((error,_req,res,_next)=>{res.status(error.status===413?413:400).json({error:error.status===413?'The song request is too large.':'Invalid request.'});});
  return app;
 }
