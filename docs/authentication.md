@@ -128,3 +128,10 @@ The original ChatGPT-hosted studio continues to use platform-managed sign-in. It
 Existing configuration audit: the Sites runtime contains only `ACESTEP_API_KEY`, marked secret, with its value masked. There is no local `.env` file. The Vercel team still returns 403, so no environment values were changed and no Vercel deployment was attempted. The music key cannot be exported from the Sites secret store; its owner must add it to Vercel directly. MongoDB, email, auth session and OAuth configuration remain required. Do not claim those values were migrated.
 
 Official OpenAI references: https://developers.openai.com/siwc/website and https://developers.openai.com/siwc/request-client-id.
+
+## Google and email launch update (2026-10-29)
+The login page hides ChatGPT sign-in when no registered OpenAI client is configured, leaving Google and email/password as the launch methods. Both work independently once their own configuration is complete.
+
+The Vercel dashboard revealed the failed build error: `No entrypoint found which imports express. Found possible entrypoint: index.mjs`. The root entrypoint now directly imports Express, mounts the existing application and exports it, following Vercel's detection contract.
+
+Dashboard inspection showed Google, Resend, MongoDB, session and music variables present, but `AUTH_EMAIL_FROM` absent. A verified Resend sender is still required for email/password signup and recovery. Secret values were not revealed or changed. Live consent, inbox delivery and music remain unverified until a successful deployment.
