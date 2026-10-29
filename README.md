@@ -1,66 +1,148 @@
-# Raaga Studio
+<p align="center">
+  <img src="docs/assets/raaga-banner.svg" alt="Raaga Studio — Your words. Your sound." width="100%" />
+</p>
 
-A private, stateless React music studio using the official ACE Music API. Enter your lyrics and a separate song style/description, choose a duration range, create, preview and download. Vocal songs require your lyrics; Instrumental mode creates music without them. The existing design, presets, instruments, language, tempo and 10–600 second controls are retained.
+<p align="center">
+  A lyrics-first AI music studio. Bring your words, shape the sound, and take your song with you.
+</p>
 
-## Data lifecycle
-The current form and result exist only in React state. Generating again replaces the result. Refresh, reopen or Start fresh returns to an empty studio. Blob URLs are revoked on replacement, reset and page exit. Download songs before leaving.
+<p align="center">
+  <a href="https://raaga-studio.vercel.app/">Open the studio</a> ·
+  <a href="#quick-start">Run locally</a> ·
+  <a href="docs/authentication.md">Authentication</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-No database, browser storage, history endpoint, audio files or object storage are used for new generations. Legacy browser data from earlier versions is left untouched, but is not read or displayed. Provider-held copies and downloaded files are outside Raaga's cleanup.
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-24-222222?logo=nodedotjs&amp;logoColor=efae85" alt="Node.js 24" />
+  <img src="https://img.shields.io/badge/React-19-222222?logo=react&amp;logoColor=efae85" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-222222?logo=typescript&amp;logoColor=efae85" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Deployed_on-Vercel-222222?logo=vercel" alt="Deployed on Vercel" />
+</p>
 
-## Architecture
-`components/music-studio.tsx` → `POST /api/music/generate` → `lib/music.mjs` → `lib/providers/ace-music.mjs` → official ACE Music → validated binary audio → browser Blob player/download.
+## A studio for the way you create
 
-Production retains the private Sites Cloudflare Worker (`worker/index.ts`). A Node/Express entrypoint (`server/index.mjs`) runs the same API and React interface locally. No scraping, selectors, cookies or access-control bypass is used. The documented provider is synchronous, so there are no invented job, progress or polling endpoints. `GET /api/music/status` reports configuration only.
+| Write | Shape | Listen |
+| :--- | :--- | :--- |
+| Paste your own lyrics, including verse and chorus labels. | Describe genre, mood, instruments and vocal delivery. | Preview your current song and download it before leaving. |
 
-Requests and responses are bounded (32 KB input, 16 MB provider JSON). Audio signatures and MIME types are validated for MP3/WAV/FLAC. Credentials remain on the backend; redirects and arbitrary audio URLs are rejected. The UI shows elapsed time, supports stopping the local request, and retries only on user action. Cancellation cannot guarantee cancellation at the provider.
+- **Your account, your key.** Connect a personal [ACE Music API key](https://acemusic.ai/playground/api-key) for the current session.
+- **Vocals or instrumental.** Keep creative control over the words, or create music without vocals.
+- **Flexible length.** Request a duration range from 10 seconds to 10 minutes; provider output length may vary.
+- **Secure accounts.** Google sign-in and verified email/password accounts, with password reset and explicit account linking.
+- **A focused workspace.** Responsive editor, sound presets, optional controls, cancellation and a listening room.
+- **Privacy-conscious analytics.** Product events and generation timing through PostHog, without lyrics, audio or credentials.
 
-## Configuration
-Production uses the Sites secret `ACESTEP_API_KEY`. For local Node use, copy `.env.example` to `.env` and enter your own key there. `.env` is ignored by Git. Never put secrets in React variables or commit them.
+## What gets saved?
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ACESTEP_API_KEY` | Required | ACE Music account API key |
-| `ACESTEP_MODEL` | Discovered | Optional model override |
-| `MUSIC_TIMEOUT_MS` | 600000 | Processing timeout; 10–900000 ms |
-| `MUSIC_MAX_CONCURRENT` | 2 | Per-instance concurrency; 1–10 |
-| `MUSIC_MAX_REQUESTS` | 3 | Per-user requests per window; 1–100 |
-| `MUSIC_RATE_WINDOW_MS` | 60000 | Counter retention; 10–3600000 ms |
-| `PORT` | 3000 | Local Express port |
+**Accounts persist. Songs do not.** MongoDB stores accounts, password hashes, sessions and verification records. The form, personal music key and current audio stay in browser memory; they are not saved to MongoDB or browser storage.
 
-Only expiring rate/concurrency counters exist in server memory. No prompt/audio/job records are retained. Restart discards counters. In-flight work ends at timeout or disconnect; a provider that ignores abort may finish remotely. There are no temporary files requiring restart cleanup.
+Refreshing or leaving clears the current studio. A new generation replaces the previous result. **Download your song before leaving.** Files you download and copies retained by ACE Music are outside Raaga's cleanup. Configured PostHog usage events follow the project's analytics retention policy.
 
-## Run and verify
-Node 22.13 or later is required.
+## Quick start
 
-```sh
+Use **Node.js 24.x** and npm. You will need MongoDB Atlas plus at least one configured sign-in method. A shared music key is optional because listeners can connect their own.
+
+```bash
+git clone https://github.com/ayush-gupta456/Raaga-ai-powered-music.git
+cd Raaga-ai-powered-music
 npm ci
-npm test
-npm run lint
-npx tsc --noEmit
+```
+
+Copy `.env.example` to `.env`, fill in your server settings, then run:
+
+```bash
 npm run build:node
 npm run start:node
 ```
 
-Open `http://127.0.0.1:3000`. Express binds to loopback only and checks the exact origin. It is a local single-user server, not a public authentication system. Production uses Sites' trusted visitor identity and retains owner-private access. Do not expose Express publicly without adding proper authentication and deployment controls.
+Open **http://127.0.0.1:3000**. Use that exact origin in local auth configuration. Private GitHub repositories require permission to clone.
 
-The hosted build uses `npm run build` (or the Sites build helper); `npm run dev` provides the existing Worker development flow. See [architecture and audit](docs/stateless-upgrade.md) and [verification record](docs/verification.md).
+### Environment essentials
 
-## Limits
-ACE Music controls availability, account credits, accepted duration and output quality. The requested target falls inside your chosen range; actual length may differ. A ten-minute setting is not a guarantee that the provider will generate ten minutes. The 16 MB response limit can reject large outputs. No automatic retry occurs after ambiguous failures.
+| Variable | Purpose |
+| :--- | :--- |
+| `MONGODB_URI` | Account database connection string. |
+| `BETTER_AUTH_SECRET` | Stable, cryptographically random secret of at least 32 characters. |
+| `BETTER_AUTH_URL` | Exact app origin: local URL above, or your production HTTPS URL. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google web OAuth credentials, if Google sign-in is enabled. |
+| `GMAIL_APP_PASSWORD` | Gmail app password for verification/reset mail. Never use your Google password. |
+| `GMAIL_USER` | Gmail sender; defaults to the project owner's configured sender. |
+| `POSTHOG_PROJECT_TOKEN`, `POSTHOG_HOST` | Optional public ingestion token and matching US/EU region. |
+| `ACESTEP_API_KEY` | Optional shared server key; a connected personal key overrides it per request. |
+| `MUSIC_TIMEOUT_MS` | Use `280000` with the configured 300-second Vercel function budget. |
 
-Rate/concurrency enforcement is per process/Worker isolate, not a distributed quota. This remains a private personal studio. A public multi-user service requires separate distributed abuse controls. Provider retention follows its own policies.
+Gmail and Resend are alternative mail providers. See [.env.example](.env.example) for all options and [authentication setup](docs/authentication.md) for OAuth callbacks, Gmail, Resend and verification behavior. All credentials are server-only; do not prefix them with `VITE_` or `NEXT_PUBLIC_`.
 
-## Official references
-- [ACE-Step cloud API](https://github.com/ace-step/ace-step-skills/blob/main/skills/acestep/api-reference.md)
-- [ACE-Step skills](https://github.com/ace-step/ace-step-skills)
-- [React cleanup](https://react.dev/reference/react/useEffect)
-- [Blob URL cleanup](https://developer.mozilla.org/en-US/docs/Web/API/URL/revokeObjectURL_static)
-- [Express security](https://expressjs.com/en/advanced/best-practice-security/)
+## Architecture
 
-Companion skills assist development; the deployed website calls its server adapter directly.
+```mermaid
+flowchart LR
+    UI[React studio] --> API[Node / Express]
+    API --> Auth[Better Auth]
+    Auth --> DB[(MongoDB)]
+    Auth --> Mail[Gmail SMTP or Resend]
+    API --> Music[Official ACE Music API]
+    Music --> Audio[Validated audio]
+    Audio --> UI
+    API -. Timing and outcomes .-> Analytics[PostHog]
+    UI -. Allowlisted usage events .-> Analytics
+```
 
+| Location | Responsibility |
+| :--- | :--- |
+| `components/` | Authentication and music studio interfaces. |
+| `client/` | In-memory audio lifecycle and explicit usage events. |
+| `server/` | Verified sessions, mail delivery, security headers and Express routes. |
+| `lib/` | Generation validation, provider requests, limits and audio checks. |
+| `node-web/` | Primary Vite frontend entrypoint for Node/Vercel. |
+| `tests/` | Auth, email, generation, analytics and security regression tests. |
+| `app/`, `worker/` | Retained legacy Sites/Cloudflare target with platform-managed access. |
 
-## Account authentication on Node / Vercel
-The Node entrypoint now requires verified Better Auth sessions for the studio and every music API route. Accounts, hashed passwords, sessions and verification records use MongoDB; prompts and generated songs remain session-only. See [complete authentication setup](docs/authentication.md). The existing chatgpt.site Worker retains its platform-managed sign-in and is not changed by the Vercel implementation.
+The Node/Vercel target is the primary deployment. The legacy Sites target has a separate authentication model; its sessions are not shared with Vercel.
 
-Local Node use now requires the authentication variables in `.env.example`, not just a music API key. Build with `npm run build:vercel` for Vercel, or `npm run build:node` for local Express. Without configured auth credentials the UI displays setup status and private API routes fail closed. Vercel project `raaga-studio` was created, but deployment is pending team authorization and provider credentials.
+## Development and checks
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build:vercel
+```
+
+| Command | Use |
+| :--- | :--- |
+| `npm run build:node` | Build the primary browser app. |
+| `npm run start:node` | Serve the authenticated app locally. |
+| `npm run build:vercel` | Build the browser app and prepare Vercel CDN assets. |
+| `npm run dev` | Develop the retained Sites target. |
+| `npm run build` | Verify the legacy Sites/Worker build. |
+
+CI runs tests, types, lint, both builds and a dependency audit on Node 24 without production credentials. Automated provider tests use isolated fixtures; they do not spend music credits or send real email. Live OAuth consent, inbox delivery and a real personal-key generation require separate verification.
+
+## Deploy to Vercel
+
+1. Import this repository into Vercel using the Express framework preset.
+2. Add Production environment variables from `.env.example`; register the exact production Google callback.
+3. The checked-in `vercel.json` selects the build command and function configuration.
+4. Deploy, then test sign-in → verification → generation → playback → download → sign-out.
+
+Google callback: `<BETTER_AUTH_URL>/api/auth/callback/google`. Redeploy after changing environment variables. Keep production secrets and databases separate from previews.
+
+## Practical limits
+
+ACE Music controls credits, availability, output quality and final duration. The app bounds request/response sizes and wait time; a requested ten-minute song can still exceed Vercel's execution budget or the provider response limit. Stopping locally does not guarantee cancellation at the provider. There are no automatic generation retries.
+
+Music rate/concurrency counters are per instance, not a global distributed quota. Authentication rate limits are MongoDB-backed. Gmail applies account sending limits; a dedicated transactional sender is preferable as traffic grows.
+
+## Project resources
+
+- [Authentication and email setup](docs/authentication.md)
+- [Analytics and AI observability](docs/analytics.md)
+- [Design, security and verification review](docs/redesign-review.md)
+- [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
+- [Historical implementation notes](docs/archive/)
+
+## License
+
+No project license has been selected. A public URL or access to the repository does not grant a redistribution license. Dependency licenses remain with their respective authors.
