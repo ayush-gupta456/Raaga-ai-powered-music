@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Eye, EyeOff, LogOut, ShieldCheck } from 'lucide-react';
 import MusicStudio from './music-studio';
+import {identifyUser,track} from '../client/analytics';
 
 type User={id:string;name:string;email:string};
 type AuthState={configured:boolean;email:boolean;google:boolean;openai?:boolean;user:User|null};
@@ -21,6 +22,7 @@ export default function AuthenticatedStudio(){
  const [show,setShow]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const refresh=useCallback(async()=>{try{const r=await fetch('/api/app-auth/session',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw Error('Sign-in is temporarily unavailable.');setState(await r.json() as AuthState);}catch{setError('Cannot reach sign-in. Check your connection and reload.');}finally{setChecking(false);}},[]);
  useEffect(()=>{const controller=new AbortController();fetch('/api/app-auth/session',{cache:'no-store',credentials:'same-origin',signal:controller.signal}).then(async r=>{if(!r.ok)throw Error();return await r.json() as AuthState;}).then(setState).catch(()=>{if(!controller.signal.aborted)setError('Cannot reach sign-in. Check your connection and reload.');}).finally(()=>{if(!controller.signal.aborted)setChecking(false);});const focus=()=>void refresh();window.addEventListener('focus',focus);return()=>{controller.abort();window.removeEventListener('focus',focus);};},[refresh]);
+ useEffect(()=>{if(checking)return;identifyUser(state?.user?.id||null);track('page_viewed',{view:state?.user?.id?'studio':view});},[checking,state?.user?.id,view]);
  function change(next:View){setView(next);setError('');setMessage('');setPassword('');setConfirm('');setShow(false);window.history.replaceState(null,'','/'+next);}
  async function submit(e:React.FormEvent){
   e.preventDefault();if(busy)return;setError('');setMessage('');
@@ -31,9 +33,9 @@ export default function AuthenticatedStudio(){
    const normalized=email.trim().toLowerCase();
    if(view==='sign-up'){
     await authRequest('sign-up/email',{name:name.trim(),email:normalized,password,callbackURL:'/sign-in'});
-    setPassword('');setConfirm('');setView('verify-email');setMessage('If this email can be registered, a verification link is on its way. Already have an account? Sign in or reset your password.');
+    track('account_created');setPassword('');setConfirm('');setView('verify-email');setMessage('If this email can be registered, a verification link is on its way. Already have an account? Sign in or reset your password.');
    }else if(view==='sign-in'){
-    await authRequest('sign-in/email',{email:normalized,password,callbackURL:'/studio'});setPassword('');await refresh();window.history.replaceState(null,'','/studio');
+    await authRequest('sign-in/email',{email:normalized,password,callbackURL:'/studio'});setPassword('');track('sign_in_completed');await refresh();window.history.replaceState(null,'','/studio');
    }else if(view==='forgot-password'){
     await authRequest('request-password-reset',{email:normalized,redirectTo:window.location.origin+'/reset-password'});setMessage('If an account exists for this email, you will receive a reset link.');
    }else if(view==='verify-email'){
@@ -45,7 +47,7 @@ export default function AuthenticatedStudio(){
   }catch(e){setError(e instanceof Error?e.message:'Something went wrong. Please try again.');}finally{setBusy(false);}
  }
  async function social(provider:'google'|'openai',link=false){if(busy)return;setBusy(true);setError('');try{const data=await authRequest(link?'link-social':'sign-in/social',{provider,callbackURL:window.location.origin+'/studio',errorCallbackURL:window.location.origin+'/sign-in',disableRedirect:true});if(!data.url)throw Error('Sign-in is unavailable.');const url=new URL(data.url);if(url.origin!==(provider==='openai'?'https://auth.openai.com':'https://accounts.google.com'))throw Error('Unexpected sign-in destination.');window.location.assign(url.href);}catch(e){setError(e instanceof Error?e.message:'Sign-in could not be completed.');setBusy(false);}}
- async function logout(){setBusy(true);setError('');try{await authRequest('sign-out',{});setState(current=>current?{...current,user:null}:null);change('sign-in');}catch{setError('Could not sign out. Please try again.');}finally{setBusy(false);}}
+ async function logout(){setBusy(true);setError('');try{await authRequest('sign-out',{});track('sign_out_completed');identifyUser(null);setState(current=>current?{...current,user:null}:null);change('sign-in');}catch{setError('Could not sign out. Please try again.');}finally{setBusy(false);}}
  if(checking)return <div className="auth-loading" role="status">Opening your studio…</div>;
  if(state?.user)return <><div className="account-bar"><span><ShieldCheck size={16}/>{state.user.name}</span>{state.openai&&<button disabled={busy} onClick={()=>void social('openai',true)}>Link ChatGPT</button>}{state.google&&<button disabled={busy} onClick={()=>void social('google',true)}>Link Google</button>}<button disabled={busy} onClick={()=>void logout()}><LogOut size={16}/>Sign out</button>{error&&<span role="alert">{error}</span>}</div><MusicStudio/></>;
  const passwordView=view==='sign-in'||view==='sign-up'||view==='reset-password';
@@ -63,5 +65,5 @@ export default function AuthenticatedStudio(){
  {view==='sign-in'&&<button className="auth-link" disabled={busy} onClick={()=>change('verify-email')}>Resend verification email</button>}
  {(view==='sign-in'||view==='sign-up')&&<><div className="auth-divider"><span>OR</span></div>{state?.openai&&<button className="chatgpt-button" type="button" disabled={busy} onClick={()=>void social('openai')}>Continue with ChatGPT</button>}<button className="google-button" type="button" disabled={busy||!state?.google} onClick={()=>void social('google')}><img src="/google.svg" width="20" height="20" alt=""/>Continue with Google</button>{!state?.google&&state?.configured&&<p className="quiet">Google sign-in is awaiting configuration.</p>}</>}
  <p className="auth-switch">{view==='sign-in'?<>New to Raaga? <button className="auth-link" onClick={()=>change('sign-up')}>Create an account</button></>:<>Already have an account? <button className="auth-link" onClick={()=>change('sign-in')}>Sign in</button></>}</p>
- <p className="auth-privacy">Your songs stay in this session. Your account stays yours.</p></section></div></main>;
+ <p className="auth-privacy">Your songs stay in this session. Usage analytics excludes your lyrics, audio and keys.</p></section></div></main>;
 }
