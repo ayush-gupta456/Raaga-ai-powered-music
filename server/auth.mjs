@@ -2,13 +2,37 @@ import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { mongodbAdapter } from '@better-auth/mongo-adapter';
 import { MongoClient } from 'mongodb';
+import { genericOAuth } from 'better-auth/plugins/generic-oauth';
+import { decodeJwt } from 'jose';
+
+// A registered website client is required. Never reuse Codex or Sites client IDs.
+export function openAIProviderConfig(env) {
+ const method=env.OPENAI_OAUTH_TOKEN_AUTH_METHOD||'client_secret_post';
+ if(!['client_secret_post','client_secret_basic','none'].includes(method))throw Error('Unsupported OpenAI client authentication method.');
+ return {
+  providerId:'openai',name:'ChatGPT',clientId:env.OPENAI_OAUTH_CLIENT_ID,
+  ...(method==='none'?{}:{clientSecret:env.OPENAI_OAUTH_CLIENT_SECRET}),
+  tokenEndpointAuth:{method},discoveryUrl:'https://auth.openai.com/.well-known/openid-configuration',
+  scopes:['openid','profile','email'],pkce:true,requireIdTokenVerification:true,
+  requireEmailVerification:true,disableProviderLogout:true,
+  // Generic OIDC verifies the signature, issuer, audience and nonce before this
+  // callback. Require an ID token, rather than falling back to userinfo alone.
+  getUserInfo:async tokens=>tokens.idToken?decodeJwt(tokens.idToken):null,
+  accountSubject:({profile})=>{
+   if(typeof profile.sub!=='string'||!profile.sub)throw Error('Missing verified OpenAI subject.');
+   return JSON.stringify(['https://auth.openai.com',env.OPENAI_OAUTH_CLIENT_ID,profile.sub]);
+  },
+  mapProfileToUser:profile=>({emailVerified:profile.email_verified===true,name:typeof profile.name==='string'&&profile.name.trim()?profile.name:'Raaga listener'})
+ };
+}
 
 export function authConfiguration(env) {
  const origin=new URL(env.BETTER_AUTH_URL||'http://127.0.0.1:3000').origin;
  const secure=origin.startsWith('https:');
  if(env.BETTER_AUTH_URL&&env.NODE_ENV==='production'&&!secure)throw Error('Production authentication requires HTTPS.');
  const configured=Boolean(env.MONGODB_URI&&env.BETTER_AUTH_SECRET?.length>=32&&env.BETTER_AUTH_URL);
- return {origin,secure,configured,email:configured&&Boolean(env.RESEND_API_KEY&&env.AUTH_EMAIL_FROM),google:configured&&Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET)};
+ const openai=configured&&Boolean(env.OPENAI_OAUTH_CLIENT_ID&&(env.OPENAI_OAUTH_TOKEN_AUTH_METHOD==='none'||env.OPENAI_OAUTH_CLIENT_SECRET));
+ return {origin,secure,configured,openai,email:configured&&Boolean(env.RESEND_API_KEY&&env.AUTH_EMAIL_FROM),google:configured&&Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET)};
 }
 
 export function buildAuth({env,database,sendMail,rateStorage='database'}) {
@@ -17,6 +41,7 @@ export function buildAuth({env,database,sendMail,rateStorage='database'}) {
  return betterAuth({
   appName:'Raaga Studio',baseURL:config.origin,secret:env.BETTER_AUTH_SECRET,
   database,trustedOrigins:[config.origin],logger:{disabled:true},
+  plugins:config.openai?[genericOAuth({config:[openAIProviderConfig(env)]})]:[],
   emailAndPassword:{enabled:config.email,minPasswordLength:12,maxPasswordLength:128,requireEmailVerification:true,autoSignIn:false,revokeSessionsOnPasswordReset:true,resetPasswordTokenExpiresIn:1800,
    sendResetPassword:async({user,url})=>sendMail({to:user.email,subject:'Reset your Raaga password',text:`Reset your password using this link (expires in 30 minutes): ${url}\nIf you did not request this, ignore this email.`})},
   emailVerification:{sendOnSignUp:true,sendOnSignIn:true,autoSignInAfterVerification:false,expiresIn:3600,

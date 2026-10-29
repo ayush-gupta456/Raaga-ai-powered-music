@@ -12,9 +12,9 @@ export function createApp({env=process.env,api=createMusicAPI(),port=3000,getAut
  const origin=env.BETTER_AUTH_URL?new URL(env.BETTER_AUTH_URL).origin:`http://127.0.0.1:${port}`;
  app.use((req,res,next)=>{res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');next();});
  app.get('/api/app-auth/session',async(req,res)=>{
-  try{const config=authConfiguration(env);if(!config.configured)return res.json({user:null,configured:false,email:false,google:false});
+  try{const config=authConfiguration(env);if(!config.configured)return res.json({user:null,configured:false,email:false,google:false,openai:false});
    const auth=await getAuth();const session=await auth.api.getSession({headers:fromNodeHeaders(req.headers)});
-   res.json({configured:true,email:config.email,google:config.google,user:session?.user?.emailVerified?{id:session.user.id,name:session.user.name,email:session.user.email}:null});
+   res.json({configured:true,email:config.email,google:config.google,openai:config.openai,user:session?.user?.emailVerified?{id:session.user.id,name:session.user.name,email:session.user.email}:null});
   }catch{res.status(503).json({error:'Sign-in is temporarily unavailable. Please try again later.'});}
  });
  app.all('/api/auth/*splat',async(req,res)=>{

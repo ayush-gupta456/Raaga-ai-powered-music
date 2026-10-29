@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {memoryAdapter} from 'better-auth/adapters/memory';
-import {buildAuth,authConfiguration} from '../server/auth.mjs';
+import {buildAuth,authConfiguration,openAIProviderConfig} from '../server/auth.mjs';
 import {createApp} from '../server/index.mjs';
 const origin='http://127.0.0.1:3000';
 const env={MONGODB_URI:'mongodb://test-only',BETTER_AUTH_URL:origin,BETTER_AUTH_SECRET:'test-only-secret-with-more-than-thirty-two-characters',RESEND_API_KEY:'test',AUTH_EMAIL_FROM:'test@example.com'};
@@ -49,6 +49,22 @@ test('production config requires HTTPS and credentials, and never enables an unc
  assert.equal(authConfiguration({}).configured,false);
  assert.equal(authConfiguration(env).google,false);
  assert.equal(authConfiguration({...env,GOOGLE_CLIENT_ID:'id',GOOGLE_CLIENT_SECRET:'secret'}).google,true);
+});
+test('OpenAI sign-in is gated by registration and binds verified subject to issuer and client',async()=>{
+ assert.equal(authConfiguration(env).openai,false);
+ const registered={...env,OPENAI_OAUTH_CLIENT_ID:'oaiapp_test',OPENAI_OAUTH_CLIENT_SECRET:'test-only'};
+ assert.equal(authConfiguration(registered).openai,true);
+ const provider=openAIProviderConfig(registered);
+ assert.equal(provider.requireIdTokenVerification,true);assert.equal(provider.pkce,true);
+ assert.equal(provider.disableIdTokenNonceBinding,undefined);
+ assert.equal(provider.discoveryUrl,'https://auth.openai.com/.well-known/openid-configuration');
+ assert.equal(provider.requireEmailVerification,true);
+ assert.equal(await provider.getUserInfo({accessToken:'not-an-id-token'}),null);
+ assert.deepEqual(JSON.parse(provider.accountSubject({profile:{sub:'stable-id',email:'mutable@example.com'}})),['https://auth.openai.com','oaiapp_test','stable-id']);
+ assert.throws(()=>provider.accountSubject({profile:{email:'mutable@example.com'}}));
+ assert.equal(provider.mapProfileToUser({email_verified:'true'}).emailVerified,false);
+ assert.throws(()=>openAIProviderConfig({...registered,OPENAI_OAUTH_TOKEN_AUTH_METHOD:'unsafe'}));
+ const publicClient=openAIProviderConfig({...registered,OPENAI_OAUTH_TOKEN_AUTH_METHOD:'none'});assert.equal(publicClient.clientSecret,undefined);
 });
 test('Express rejects anonymous and forged identity requests to private music routes',async()=>{
  const app=createApp({env,getAuth:async()=>({api:{getSession:async()=>null}})});

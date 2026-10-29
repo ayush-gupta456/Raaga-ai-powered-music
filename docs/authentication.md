@@ -114,3 +114,17 @@ Browser QA on the isolated test server verified password-confirmation errors, lo
 - [Express on Vercel](https://vercel.com/docs/frameworks/backend/express)
 
 Final validation: 34/34 tests passed, TypeScript and ESLint passed without warnings, Vercel/Node production build passed, and the existing Sites/Worker build passed. No live MongoDB, Google OAuth consent, external mail delivery or Vercel deployment was performed because credentials and the team grant remain unavailable.
+
+
+## OpenAI / ChatGPT sign-in update
+The Vercel account screen now includes **Continue with ChatGPT** alongside email/password and the optional Google method. It uses Better Auth's maintained generic OIDC provider with the fixed OpenAI discovery URL, PKCE, server-generated nonce binding, required ID-token signature/issuer/audience validation and a verified-email gate. Account identity is namespaced by issuer, registered client ID and stable subject, never email alone. Existing-account linking remains explicit. Local logout ends the Raaga session without logging the user out of their OpenAI account.
+
+A registered website OAuth client is required. OpenAI currently offers this website integration to selected commercial partners; request access at https://developers.openai.com/siwc/request-client-id. An ordinary OpenAI API key, a ChatGPT subscription, the Sites client ID or a Codex OAuth client ID is not a substitute. Do not use the open-source plan-usage client-registration flow for a hosted website.
+
+Set server-only `OPENAI_OAUTH_CLIENT_ID`, `OPENAI_OAUTH_CLIENT_SECRET` (for a confidential client), and `OPENAI_OAUTH_TOKEN_AUTH_METHOD` matching the registration (`client_secret_post`, `client_secret_basic`, or `none` for a public client). Register the exact callback `<BETTER_AUTH_URL>/api/auth/callback/openai`, locally `http://127.0.0.1:3000/api/auth/callback/openai`. Only `openid profile email` scopes are requested; this does not consume the user's ChatGPT plan for music generation. No live OpenAI login is claimed until the app has registration credentials and an approved callback.
+
+The original ChatGPT-hosted studio continues to use platform-managed sign-in. Its login and sessions cannot simply be copied to a Vercel domain. The new account screen offers an explicitly labelled link to that existing studio while Vercel setup is pending; this link does not authenticate a Node session.
+
+Existing configuration audit: the Sites runtime contains only `ACESTEP_API_KEY`, marked secret, with its value masked. There is no local `.env` file. The Vercel team still returns 403, so no environment values were changed and no Vercel deployment was attempted. The music key cannot be exported from the Sites secret store; its owner must add it to Vercel directly. MongoDB, email, auth session and OAuth configuration remain required. Do not claim those values were migrated.
+
+Official OpenAI references: https://developers.openai.com/siwc/website and https://developers.openai.com/siwc/request-client-id.
