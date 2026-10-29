@@ -59,3 +59,8 @@ Rate/concurrency enforcement is per process/Worker isolate, not a distributed qu
 
 Companion skills assist development; the deployed website calls its server adapter directly.
 
+
+## Account authentication on Node / Vercel
+The Node entrypoint now requires verified Better Auth sessions for the studio and every music API route. Accounts, hashed passwords, sessions and verification records use MongoDB; prompts and generated songs remain session-only. See [complete authentication setup](docs/authentication.md). The existing chatgpt.site Worker retains its platform-managed sign-in and is not changed by the Vercel implementation.
+
+Local Node use now requires the authentication variables in `.env.example`, not just a music API key. Build with `npm run build:vercel` for Vercel, or `npm run build:node` for local Express. Without configured auth credentials the UI displays setup status and private API routes fail closed. Vercel project `raaga-studio` was created, but deployment is pending team authorization and provider credentials.

@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import MusicStudio from '../components/music-studio';
+import AuthenticatedStudio from '../components/authenticated-studio';
 import '../public/style.css';
-createRoot(document.getElementById('root')!).render(<StrictMode><MusicStudio/></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode><AuthenticatedStudio/></StrictMode>);
