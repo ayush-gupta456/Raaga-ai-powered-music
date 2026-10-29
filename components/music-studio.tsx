@@ -21,18 +21,19 @@ export default function MusicStudio(){
  const [keyDraft,setKeyDraft]=useState(''),[personalKey,setPersonalKey]=useState(''),[keyError,setKeyError]=useState('');
  const [showKey,setShowKey]=useState(false);
  function connectKey(){const key=keyDraft.trim();if(!/^[\x21-\x7e]{1,512}$/.test(key)){setKeyError('Paste your ACE Music API key without spaces.');return;}setPersonalKey(key);track('ace_key_connected');setKeyDraft('');setShowKey(false);setKeyError('');}
- function disconnectKey(){setPersonalKey('');setKeyDraft('');setShowKey(false);setKeyError('');}
+ const disconnectKey=useCallback(()=>{setPersonalKey('');setKeyDraft('');setShowKey(false);setKeyError('');},[]);
  const session=useRef<AudioSession|null>(null),guide=useRef<HTMLDialogElement>(null),styleInput=useRef<HTMLTextAreaElement>(null),lyricsInput=useRef<HTMLTextAreaElement>(null);
  const busy=phase==='waiting'||phase==='receiving';
  const reset=useCallback(()=>{session.current?.dispose();setResult(null);setForm({...defaults});setError('');setElapsed(0);setPhase('idle');},[]);
+ const sessionExpired=useCallback(()=>{session.current?.dispose();disconnectKey();setResult(null);setPhase('idle');window.dispatchEvent(new Event('raaga:session-expired'));},[disconnectKey]);
  useEffect(()=>{
   const controller=new AbortController();
-  fetch('/api/music/status',{signal:controller.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw Error();return r.json();}).then(s=>setEngine(s && typeof s==='object' && 'configured' in s && s.configured?'configured':'missing')).catch(()=>{if(!controller.signal.aborted)setEngine('offline');});
+  fetch('/api/music/status',{signal:controller.signal,cache:'no-store'}).then(async r=>{if(r.status===401){sessionExpired();throw Error();}if(!r.ok)throw Error();return r.json();}).then(s=>setEngine(s && typeof s==='object' && 'configured' in s && s.configured?'configured':'missing')).catch(()=>{if(!controller.signal.aborted)setEngine('offline');});
   const leave=()=>{session.current?.dispose();disconnectKey();};
   const restore=(event:PageTransitionEvent)=>{if(event.persisted){reset();disconnectKey();}};
   window.addEventListener('pagehide',leave);window.addEventListener('pageshow',restore);
   return()=>{controller.abort();session.current?.dispose();window.removeEventListener('pagehide',leave);window.removeEventListener('pageshow',restore);};
- },[reset]);
+ },[reset,disconnectKey,sessionExpired]);
  useEffect(()=>{if(!busy)return;const timer=setInterval(()=>setElapsed(n=>n+1),1000);return()=>clearInterval(timer);},[busy]);
  const update=(key:keyof SongForm,value:string)=>setForm(current=>({...current,[key]:value}));
  let summary='';try{if(form.durationMode==='auto')summary='ACE Music chooses a natural length for your lyrics and style.';else{const {min,max}=durationRange(form);summary=`Range ${formatDuration(min)}–${formatDuration(max)} · Estimated target ${formatDuration(targetDuration(form))}`;}}catch(e){summary=e instanceof Error?e.message:'Check the duration range.';}
@@ -42,6 +43,7 @@ export default function MusicStudio(){
   const owner=session.current??(session.current=new AudioSession());const request=owner.begin();setResult(null);setPhase('waiting');setElapsed(0);track('song_generation_started',{mode:form.mode,has_personal_key:!!personalKey});
   try{
    const response=await fetch('/api/music/generate',{method:'POST',headers:{'Content-Type':'application/json',...(personalKey?{'X-ACE-Music-Key':personalKey}:{})},body:JSON.stringify(form),signal:request.signal,cache:'no-store'});
+   if(response.status===401){sessionExpired();return;}
    if(!response.ok){const failure=await response.json().catch(()=>({}));throw Error(failure && typeof failure==='object' && 'error' in failure && typeof failure.error==='string' ? failure.error : 'The server disconnected. Please try again.');}
    if(!/^audio\/(mpeg|wav|flac)(;|$)/.test(response.headers.get('Content-Type')||''))throw Error('The server did not return supported audio.');
    if(request.signal.aborted)return;setPhase('receiving');const blob=await response.blob();if(!blob.size)throw Error('The returned audio was empty.');

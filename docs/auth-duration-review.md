@@ -22,3 +22,13 @@ Auto is the default song length and resets with Start fresh. It omits `audio_con
 - [Better Auth accounts and linking](https://better-auth.com/docs/concepts/users-accounts)
 - [Better Auth email/password](https://better-auth.com/docs/authentication/email-password)
 - [ACE-Step audio configuration](https://ace-step.github.io/ACE-Step-1.5/en/Openrouter_API_DOC)
+
+## Follow-up flow review
+
+- Password-reset pages now render even if a verified session is already open. Missing-token pages hide the unusable form and provide a direct route to request a new link. Reset screens also offer recovery for expired/reused links.
+- Successful password reset clears the displayed account state; backend tests confirm every previous session is revoked and reset tokens cannot be reused.
+- Music status/generation 401 responses dispose temporary audio and keys and return the Node authentication interface to sign-in. Browser verification reproduced this transition using an isolated expired-session fixture.
+- Session refresh errors no longer erase form errors or falsely move the URL to `/studio` after an unconfirmed login. A connection-retry action is available when authentication cannot load.
+- Browser checks used synthetic WAV audio to verify generation loading, metadata, actual play/pause controls, download-button interaction and result disposal on reset. A downloaded file was not inspected on disk. These checks do not establish live music-provider availability or output quality.
+- Live mail diagnostics established the affected account was already verified. A user-authorized password-reset request was accepted by Gmail; inbox receipt has not been independently verified.
+- Final automated coverage includes 60 tests, with additional checks for session revocation during password reset and for securely adding a password to a verified Google-only account without duplicating the user. Types, lint, both deployment builds and dependency audit passed; the audit reported zero known vulnerabilities.

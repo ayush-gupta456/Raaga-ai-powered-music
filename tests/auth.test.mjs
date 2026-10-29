@@ -140,3 +140,31 @@ test('resend verification is private, verifies the account, and linked provider 
  assert.equal(auth.options.account.accountLinking.allowDifferentEmails,false);
  assert.equal((await call('link-social',{provider:'google',callbackURL:'/studio'})).status,401);
 });
+
+test('password reset while signed in revokes every existing session and cannot be reused',async()=>{
+ const {call,mail}=fixture();
+ await call('sign-up/email',signup);
+ const verify=new URL(mail[0].text.match(/https?:\/\/\S+/)[0]);await call('verify-email?token='+verify.searchParams.get('token'));
+ const first=cookieOf(await call('sign-in/email',{email:signup.email,password:signup.password}));
+ const second=cookieOf(await call('sign-in/email',{email:signup.email,password:signup.password}));
+ assert.equal((await call('request-password-reset',{email:signup.email,redirectTo:origin+'/reset-password'},first)).status,200);
+ const url=new URL(mail.at(-1).text.match(/https?:\/\/\S+/)[0]);const token=url.pathname.split('/').pop();
+ assert.equal((await call('reset-password',{newPassword:'replacement-password-123!',token},first)).status,200);
+ for(const cookie of [first,second])assert.equal(await (await call('get-session',null,cookie)).json(),null);
+ assert.equal((await call('reset-password',{newPassword:'replacement-password-123!',token})).status,400);
+ assert.equal((await call('reset-password',{newPassword:'replacement-password-123!',token:'invalid-token'})).status,400);
+ assert.equal((await call('sign-in/email',{email:signup.email,password:'replacement-password-123!'})).status,200);
+});
+
+test('a verified Google-only account can add email/password through its emailed reset link',async()=>{
+ const {call,mail,db}=fixture();await call('sign-up/email',signup);
+ const verify=new URL(mail[0].text.match(/https?:\/\/\S+/)[0]);await call('verify-email?token='+verify.searchParams.get('token'));
+ db.account.splice(0,db.account.length,{id:'google-only',providerId:'google',accountId:'isolated-google-subject',userId:db.user[0].id,createdAt:new Date(),updatedAt:new Date()});
+ assert.equal((await call('sign-in/email',{email:signup.email,password:signup.password})).status,401);
+ assert.equal((await call('request-password-reset',{email:signup.email,redirectTo:origin+'/reset-password'})).status,200);
+ const url=new URL(mail.at(-1).text.match(/https?:\/\/\S+/)[0]);const token=url.pathname.split('/').pop();
+ assert.equal((await call('reset-password',{newPassword:'added-password-through-email!',token})).status,200);
+ assert.equal((await call('sign-in/email',{email:signup.email,password:'added-password-through-email!'})).status,200);
+ assert.deepEqual(db.account.map(account=>account.providerId).sort(),['credential','google']);
+ assert.equal(db.user.length,1);
+});
